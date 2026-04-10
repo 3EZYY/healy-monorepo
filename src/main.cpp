@@ -1,18 +1,24 @@
 #include <Arduino.h>
+#include "network_module.h"
 
-// put function declarations here:
-int myFunction(int, int);
+unsigned long previousMillis = 0;
+const long interval = 2000;
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  Serial.begin(115200);
+  
+  connectWiFi("dummy_ssid", "dummy_password");
+  initWebSocket("dummy_host", 8080, "/ws");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  networkLoop();
+  
+  unsigned long currentMillis = millis();
+  
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    
+    sendTelemetry("{\"message\": \"Hello World\", \"status\": \"online\"}");
+  }
 }
