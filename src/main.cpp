@@ -2,6 +2,7 @@
 #include "sensor_module.h"
 #include "display_module.h"
 #include "network_module.h"
+#include "audio_module.h"
 
 unsigned long previousMillis = 0;
 const long interval = 1000;
@@ -11,6 +12,7 @@ void setup() {
   
   initSensors();
   initDisplay();
+  initI2S();
   
   // WiFi and WebSocket initialization (placeholders)
   connectWiFi("HEALY_AP", "healy123");
@@ -19,6 +21,7 @@ void setup() {
 
 void loop() {
   networkLoop();
+  loopbackTest(); // Continuous audio loopback
   
   unsigned long currentMillis = millis();
   
