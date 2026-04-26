@@ -1135,10 +1135,10 @@ Hubungkan usecase dengan repository interface. Pastikan usecase tidak langsung i
 | Delivery | `internal/delivery/websocket/hub.go` | ✅ DONE | Hub, client, dan handler selesai |
 | Delivery | `internal/delivery/http/router.go` | ✅ DONE | Routing dan server selesai |
 | Config | `pkg/config/config.go` | ✅ DONE | |
-| Frontend | Design tokens + Tailwind | ⬜ TODO | |
-| Frontend | SensorCard, StatusChip | ⬜ TODO | |
-| Frontend | Dashboard page | ⬜ TODO | |
-| Frontend | Landing page | ⬜ TODO | |
+| Frontend | Design tokens + Tailwind | ✅ DONE | Tailwind v4 @theme, globals.css, design-tokens.ts |
+| Frontend | SensorCard, StatusChip | ✅ DONE | + NavSidebar, glass-card, framer-motion |
+| Frontend | Dashboard page | ✅ DONE | Mock data scaffold, sensor grid, activity feed |
+| Frontend | Landing page | ✅ DONE | Hero section, features, login page |
 
 ---
 
