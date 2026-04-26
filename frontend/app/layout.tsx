@@ -24,7 +24,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HEALY — Health Observer Robot",
+  title: {
+    template: "%s | HEALY Health Observer",
+    default: "HEALY — Health Observer Robot",
+  },
   description:
     "Real-time health monitoring system powered by IoT sensors. Track body temperature, heart rate, and blood oxygen levels with clinical precision.",
   keywords: [
@@ -36,7 +39,22 @@ export const metadata: Metadata = {
     "temperature",
     "heart rate",
     "SpO2",
+    "clinical",
+    "dashboard",
   ],
+  authors: [{ name: "HEALY Team" }],
+  openGraph: {
+    title: "HEALY — Health Observer Robot",
+    description: "Real-time health monitoring system powered by IoT sensors. Track body temperature, heart rate, and blood oxygen levels with clinical precision.",
+    type: "website",
+    locale: "en_US",
+    siteName: "HEALY Health Observer",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "HEALY — Health Observer Robot",
+    description: "Real-time health monitoring system powered by IoT sensors. Track body temperature, heart rate, and blood oxygen levels with clinical precision.",
+  },
 };
 
 export default function RootLayout({
