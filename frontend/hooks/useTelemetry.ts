@@ -43,8 +43,8 @@ function useMockTelemetry(
 ): TelemetrySource {
   const [data, setData] = useState<TelemetryPayload | null>(null)
   const [conn, setConn] = useState<ConnectionState>({
-    status: 'DISCONNECTED',
-    lastUpdate: null,
+    status: 'CONNECTED',
+    lastUpdate: new Date(),
     retryCount: 0,
   })
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -57,13 +57,14 @@ function useMockTelemetry(
   }, [onMessage, onStatusChange])
 
   useEffect(() => {
-    // Initialize first connection state and payload
-    onStatusRef.current?.('CONNECTED')
-    setConn({ status: 'CONNECTED', lastUpdate: new Date(), retryCount: 0 })
-    
-    const initialPayload = generateMockPayload()
-    onMessageRef.current?.(initialPayload)
-    setData(initialPayload)
+    // Initialize first connection state and payload asynchronously
+    // to prevent cascading renders during the initial commit
+    const timer = setTimeout(() => {
+      onStatusRef.current?.('CONNECTED')
+      const initialPayload = generateMockPayload()
+      onMessageRef.current?.(initialPayload)
+      setData(initialPayload)
+    }, 0)
 
     // Generate every MOCK_INTERVAL_MS
     intervalRef.current = setInterval(() => {
@@ -74,6 +75,7 @@ function useMockTelemetry(
     }, MOCK_INTERVAL_MS)
 
     return () => {
+      clearTimeout(timer)
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
