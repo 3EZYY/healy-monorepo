@@ -1,0 +1,18 @@
+# Environment variables
+.env*
+!.env.example
+
+# Binary and build artifacts
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Dependencies
+/vendor/
+
+# Debug and temporary files
+/tmp/
+.DS_Store

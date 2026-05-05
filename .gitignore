@@ -10,7 +10,8 @@ GEMINI.md
 .vscode/
 
 # Backend (Golang)
-backend/.env
+backend/.env*
+!backend/.env.example
 backend/tmp/
 backend/bin/
 *.exe
@@ -18,7 +19,8 @@ backend/bin/
 # Frontend (Next.js)
 frontend/node_modules/
 frontend/.next/
-frontend/.env.local
+frontend/.env*
+!frontend/.env.example
 node_modules/
 
 # OS Files
