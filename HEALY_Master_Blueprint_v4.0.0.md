@@ -61,7 +61,7 @@
 |---|---|---|---|
 | F-01 | Light/Dark Mode — `next-themes` | Frontend-only | ✅ DONE |
 | F-02 | AI Accent: Violet → Clinical Teal `#0D9488` | Design Token | ✅ DONE (via F-01 globals.css) |
-| F-03 | Separated History Charts (3 line chart terpisah) | Frontend-only | TODO |
+| F-03 | Separated History Charts (3 line chart terpisah) | Frontend-only | ✅ DONE |
 | F-04 | Interactive AI Chatbot Context-Aware (Groq) | Frontend-only | TODO |
 
 ---
@@ -1653,19 +1653,19 @@ Semua file backend berstatus ✅ DONE. Tidak ada perubahan di Fase 12–15.
 | `app/globals.css` | ✅ DONE | MODIFY — dark mode `.dark` vars + AI accent Teal + theme transition (F-01, F-02) |
 | `components/ui/theme-toggle.tsx` | ✅ DONE | NEW — Light/Dark toggle button, lucide-react Sun/Moon (F-01) |
 | `tailwind.config.ts` | ⬜ N/A | Tailwind v4 — tidak ada config file, gunakan `@theme` di globals.css |
-| `app/history/page.tsx` | ⬜ TODO | MODIFY — 3 chart terpisah (F-03) |
+| `app/history/page.tsx` | ✅ DONE | MODIFY — 3 chart terpisah (F-03) |
 | `constants/design-tokens.ts` | ✅ DONE | MODIFY — aiAccent teal, master v4.0 (F-02) |
 | `types/chat.ts` | ⬜ TODO | NEW — ChatMessage, ChatContext (F-04) |
-| `types/telemetry.ts` | ⬜ TODO | MODIFY — tambah TelemetryChartPoint (F-03) |
+| `types/telemetry.ts` | ✅ DONE | MODIFY — tambah TelemetryChartPoint (F-03) |
 | `lib/groq-client.ts` | ⬜ TODO | MODIFY — tambah callGroqChat (F-04) |
 | `hooks/useChatbot.ts` | ⬜ TODO | NEW — chatbot state management (F-04) |
 | `components/features/NavSidebar.tsx` | ⬜ TODO | MODIFY — ChatbotTrigger button (F-04) |
 | `components/features/AIInsightCard.tsx` | ✅ DONE | MODIFY — teal accent (F-02) |
 | `components/features/AlertFeed.tsx` | ✅ DONE | MODIFY — teal accent (F-02) |
 | `components/features/AIChatPanel.tsx` | ⬜ TODO | NEW — sliding chatbot panel (F-04) |
-| `components/features/TemperatureChart.tsx` | ⬜ TODO | NEW — standalone temp chart (F-03) |
-| `components/features/HeartRateChart.tsx` | ⬜ TODO | NEW — standalone BPM chart (F-03) |
-| `components/features/SpO2Chart.tsx` | ⬜ TODO | NEW — standalone SpO2 chart (F-03) |
+| `components/features/TemperatureChart.tsx` | ✅ DONE | NEW — standalone temp chart (F-03) |
+| `components/features/HeartRateChart.tsx` | ✅ DONE | NEW — standalone BPM chart (F-03) |
+| `components/features/SpO2Chart.tsx` | ✅ DONE | NEW — standalone SpO2 chart (F-03) |
 | `app/dashboard/page.tsx` | ⬜ TODO | MODIFY — integrasi chatbot (F-04) |
 
 ---

@@ -2,43 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import dynamic from 'next/dynamic'
 import StatusChip from '@/components/features/StatusChip'
 import { fetchTelemetryHistory, type TelemetryRecord } from '@/lib/api'
 import { Clock, TrendingUp, Thermometer, Heart, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
-import type { ChartDataPoint } from '@/components/features/HistoryCharts'
-
-// ─── Lazy-load Recharts (SSR disabled — Recharts depends on browser APIs) ───
-const HistoryCharts = dynamic(
-  () => import('@/components/features/HistoryCharts'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="space-y-6">
-        {/* Temperature chart skeleton */}
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-healy-sage/10 animate-pulse" />
-            <div className="h-5 w-40 bg-healy-bg-alt rounded-lg animate-pulse" />
-          </div>
-          <div className="w-full h-70 bg-healy-bg-alt/50 rounded-xl animate-pulse flex items-center justify-center">
-            <Loader2 className="w-6 h-6 text-healy-sage/30 animate-spin" />
-          </div>
-        </div>
-        {/* BPM/SpO2 chart skeleton */}
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-healy-critical/10 animate-pulse" />
-            <div className="h-5 w-44 bg-healy-bg-alt rounded-lg animate-pulse" />
-          </div>
-          <div className="w-full h-70 bg-healy-bg-alt/50 rounded-xl animate-pulse flex items-center justify-center">
-            <Loader2 className="w-6 h-6 text-healy-critical/30 animate-spin" />
-          </div>
-        </div>
-      </div>
-    ),
-  }
-)
+import { TemperatureChart } from '@/components/features/TemperatureChart'
+import { HeartRateChart } from '@/components/features/HeartRateChart'
+import { SpO2Chart } from '@/components/features/SpO2Chart'
 
 const TIME_RANGES = [
   { value: '1h',  label: '1 Hour' },
@@ -112,16 +81,26 @@ export default function HistoryPage() {
 
   const stats = computeStats(records)
 
-  // Prepare chart data (chronological order)
-  const chartData: ChartDataPoint[] = records
-    .slice()
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-    .map(r => ({
-      time: formatTime(r.timestamp, range),
-      temperature: r.sensor.temperature,
-      bpm: r.sensor.bpm,
-      spo2: r.sensor.spo2,
-    }))
+  // Transform data mentah untuk tiap chart (chronological order)
+  const sortedRecords = records.slice().sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+  const tempData = sortedRecords.map(r => ({
+    timestamp: formatTime(r.timestamp, range),
+    value: r.sensor.temperature,
+    status: r.status.temperature,
+  }))
+
+  const bpmData = sortedRecords.map(r => ({
+    timestamp: formatTime(r.timestamp, range),
+    value: r.sensor.bpm,
+    status: (r.sensor.bpm > 100 ? 'WARNING' : 'NORMAL') as 'NORMAL' | 'WARNING' | 'CRITICAL',
+  }))
+
+  const spo2Data = sortedRecords.map(r => ({
+    timestamp: formatTime(r.timestamp, range),
+    value: r.sensor.spo2,
+    status: r.status.spo2,
+  }))
 
   return (
     <motion.div
@@ -219,26 +198,11 @@ export default function HistoryPage() {
             </motion.div>
           )}
 
-          {/* ─── Charts (Lazy-loaded via next/dynamic) ─── */}
-          <motion.div variants={fadeUp} className="space-y-6 mb-6">
-            <div className="glass-card p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-healy-sage/10 flex items-center justify-center">
-                  <Thermometer className="w-4 h-4 text-healy-sage" aria-hidden="true" />
-                </div>
-                <h2 className="text-lg font-display font-semibold text-healy-graphite">Temperature Trend</h2>
-              </div>
-              <div className="mb-10">
-                {/* Temperature AreaChart + BPM/SpO2 LineChart are rendered together */}
-                <HistoryCharts chartData={chartData} />
-              </div>
-              <div className="flex items-center gap-3 mb-6 pt-6 border-t border-healy-border/30">
-                <div className="w-8 h-8 rounded-lg bg-healy-critical/10 flex items-center justify-center">
-                  <Heart className="w-4 h-4 text-healy-critical" aria-hidden="true" />
-                </div>
-                <h2 className="text-lg font-display font-semibold text-healy-graphite">Heart Rate & SpO₂</h2>
-              </div>
-            </div>
+          {/* Tiga Chart Terpisah — Grid 1 kolom, stacked vertikal */}
+          <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 mb-6">
+            <TemperatureChart data={tempData} loading={loading} />
+            <HeartRateChart   data={bpmData}  loading={loading} />
+            <SpO2Chart        data={spo2Data} loading={loading} />
           </motion.div>
 
           {/* Recent Records Table */}

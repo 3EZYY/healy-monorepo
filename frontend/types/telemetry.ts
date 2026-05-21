@@ -53,3 +53,18 @@ export interface AlertWithNarrative {
   narrative: string | null
   narrativeLoading: boolean
 }
+
+// Data point untuk chart Recharts (F-03)
+export interface TelemetryChartPoint {
+  timestamp: string
+  value: number
+  status: SensorStatus
+}
+
+// Konfigurasi reusable untuk chart
+export interface ChartConfig {
+  domain: [number, number]
+  color: string
+  label: string
+  unit: string
+}
