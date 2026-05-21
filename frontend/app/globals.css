@@ -1,27 +1,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap');
 @import "tailwindcss";
 
-@theme {
-  /* ─── Color Tokens (Blueprint §3.1 + v4.0 Dark Mode) ─── */
-  --color-healy-bg:        #F8FAFB;
-  --color-healy-bg-alt:    #EFF4F2;
-  --color-healy-surface:   #FFFFFF;
-  --color-healy-sage:      #4CAF82;
-  --color-healy-sage-dark: #2E8B62;
-  --color-healy-mint:      #A8DFCC;
-  --color-healy-graphite:  #1A2633;
-  --color-healy-slate:     #5A7080;
-  --color-healy-border:    #D4E8DF;
-  --color-healy-warning:   #F5A623;
-  --color-healy-critical:  #E05252;
+/* ─── Custom Variant: Enable .dark class strategy for Tailwind v4 ─── */
+@custom-variant dark (&:where(.dark, .dark *));
 
-  /* ─── Phase 10 Colors ─── */
-  --color-healy-device-on: #22C55E;
-  --color-healy-device-off: #EF4444;
+/*
+  Tailwind v4 Theme Tokens
+  ────────────────────────
+  Menggunakan @theme inline + var(...) reference agar Tailwind utilities
+  (e.g. bg-healy-bg) bisa berubah dinamis saat .dark class aktif di <html>.
+  
+  Catatan penting Tailwind v4:
+  - @theme (default/static) → tokens resolve at build time, TIDAK dinamis
+  - @theme inline           → tokens resolve di runtime via var(...) reference, DINAMIS ✅
+  
+  Ini adalah pola resmi dari Tailwind v4 docs untuk dark mode dengan custom tokens.
+*/
+@theme inline {
+  /* ─── Color Tokens (Reference ke CSS variables di :root / .dark) ─── */
+  --color-healy-bg:         var(--healy-bg);
+  --color-healy-bg-alt:     var(--healy-bg-alt);
+  --color-healy-surface:    var(--healy-surface);
+  --color-healy-sage:       var(--healy-sage);
+  --color-healy-sage-dark:  var(--healy-sage-dark);
+  --color-healy-mint:       var(--healy-mint);
+  --color-healy-graphite:   var(--healy-graphite);
+  --color-healy-slate:      var(--healy-slate);
+  --color-healy-border:     var(--healy-border);
+  --color-healy-warning:    var(--healy-warning);
+  --color-healy-critical:   var(--healy-critical);
 
-  /* ─── v4.0.0: AI Accent — Clinical Teal (replaces Violet) ─── */
-  --color-healy-ai-accent: #0D9488;
-  --color-healy-ai-surface: #F0FDFC;
+  /* Phase 10 Colors */
+  --color-healy-device-on:  var(--healy-device-on);
+  --color-healy-device-off: var(--healy-device-off);
+
+  /* v4.0.0: AI Accent — Clinical Teal (replaces Violet) */
+  --color-healy-ai-accent:  var(--healy-ai-accent);
+  --color-healy-ai-surface: var(--healy-ai-surface);
 
   /* ─── Typography (Blueprint §3.2) ─── */
   --font-display: 'Exo 2', sans-serif;
@@ -31,10 +46,10 @@
   /* ─── Border Radius ─── */
   --radius-card: 16px;
 
-  /* ─── Box Shadows (Blueprint §3.3) ─── */
-  --shadow-card:       0 4px 24px rgba(46, 139, 98, 0.08);
-  --shadow-card-hover: 0 8px 32px rgba(46, 139, 98, 0.14);
-  --shadow-glow:       0 0 0 3px rgba(76, 175, 130, 0.20);
+  /* ─── Box Shadows (Blueprint §3.3) — reference CSS var supaya bisa di-override di dark ─── */
+  --shadow-card:       var(--healy-shadow-card);
+  --shadow-card-hover: var(--healy-shadow-card-hover);
+  --shadow-glow:       var(--healy-shadow-glow);
 
   /* ─── Animations (Blueprint §3.5) ─── */
   --animate-pulse-critical: pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -46,100 +61,109 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── LIGHT MODE (Default) — CSS Custom Properties ─── */
+/* ─── LIGHT MODE (Default) ─── */
 :root {
-  --color-bg:        #F8FAFB;
-  --color-bg-alt:    #EFF4F2;
-  --color-surface:   #FFFFFF;
-  --color-sage:      #4CAF82;
-  --color-sage-dark: #2E8B62;
-  --color-mint:      #A8DFCC;
-  --color-graphite:  #1A2633;
-  --color-slate:     #5A7080;
-  --color-border:    #D4E8DF;
-  --color-warning:   #F5A623;
-  --color-critical:  #E05252;
-  --color-device-on: #22C55E;
-  --color-device-off:#EF4444;
+  --healy-bg:         #F8FAFB;
+  --healy-bg-alt:     #EFF4F2;
+  --healy-surface:    #FFFFFF;
+  --healy-sage:       #4CAF82;
+  --healy-sage-dark:  #2E8B62;
+  --healy-mint:       #A8DFCC;
+  --healy-graphite:   #1A2633;
+  --healy-slate:      #5A7080;
+  --healy-border:     #D4E8DF;
+  --healy-warning:    #F5A623;
+  --healy-critical:   #E05252;
 
-  /* v4.0.0: AI Accent — Clinical Teal */
-  --color-ai-accent: #0D9488;
-  --color-ai-surface:#F0FDFC;
+  /* Phase 10 — Device LED */
+  --healy-device-on:  #22C55E;
+  --healy-device-off: #EF4444;
 
-  --font-display-var: 'Exo 2', sans-serif;
-  --font-body-var:    'DM Sans', sans-serif;
-  --font-mono-var:    'JetBrains Mono', monospace;
+  /* v4.0.0 — AI Accent (Clinical Teal) */
+  --healy-ai-accent:  #0D9488;
+  --healy-ai-surface: #F0FDFC;
 
-  --radius-card-var: 16px;
-  --shadow-card-var: 0 4px 24px rgba(46, 139, 98, 0.08);
-  --shadow-glow-var: 0 0 0 3px rgba(76, 175, 130, 0.20);
+  /* Shadows — Light Mode */
+  --healy-shadow-card:       0 4px 24px rgba(46, 139, 98, 0.08);
+  --healy-shadow-card-hover: 0 8px 32px rgba(46, 139, 98, 0.14);
+  --healy-shadow-glow:       0 0 0 3px rgba(76, 175, 130, 0.20);
 }
 
 /* ─── DARK MODE OVERRIDES (Blueprint v4.0.0 §4.4) ─── */
 .dark {
-  /* Background — dibalik: surface lebih gelap, bukan putih */
-  --color-bg:        #0F1A14;   /* Deep Forest Dark */
-  --color-bg-alt:    #162118;   /* Slightly lighter forest */
-  --color-surface:   #1C2B1F;   /* Card surface gelap */
+  /* Background — surface lebih gelap, dibalik dari putih */
+  --healy-bg:        #0F1A14;   /* Deep Forest Dark */
+  --healy-bg-alt:    #162118;   /* Slightly lighter forest */
+  --healy-surface:   #1C2B1F;   /* Card surface gelap */
 
   /* Brand — sedikit lebih terang agar kontras di dark bg */
-  --color-sage:      #5DC491;   /* Sage lebih cerah di dark */
-  --color-sage-dark: #4CAF82;   /* Hover */
-  --color-mint:      #2D6B4F;   /* Mint lebih redup */
+  --healy-sage:      #5DC491;   /* Sage lebih cerah di dark */
+  --healy-sage-dark: #4CAF82;   /* Hover */
+  --healy-mint:      #2D6B4F;   /* Mint lebih redup */
 
   /* Text — dibalik */
-  --color-graphite:  #E8F5EE;   /* Light sage-white untuk body text */
-  --color-slate:     #8BAF9A;   /* Muted sage untuk secondary text */
+  --healy-graphite:  #E8F5EE;   /* Light sage-white untuk body text */
+  --healy-slate:     #8BAF9A;   /* Muted sage untuk secondary text */
 
   /* Border — lebih visible di dark bg */
-  --color-border:    #2A4035;
+  --healy-border:    #2A4035;
 
   /* Status — tidak berubah, tetap bold */
-  --color-warning:   #F5A623;
-  --color-critical:  #E05252;
+  --healy-warning:   #F5A623;
+  --healy-critical:  #E05252;
 
   /* AI (Clinical Teal) — v4.0.0 */
-  --color-ai-accent: #14B8A6;   /* Teal lebih terang di dark mode */
-  --color-ai-surface:#0D2B2A;   /* Dark teal surface */
+  --healy-ai-accent:  #14B8A6;   /* Teal lebih terang di dark mode */
+  --healy-ai-surface: #0D2B2A;   /* Dark teal surface */
 
   /* Device LED — tidak berubah */
-  --color-device-on:  #22C55E;
-  --color-device-off: #EF4444;
+  --healy-device-on:  #22C55E;
+  --healy-device-off: #EF4444;
 
-  /* Shadow override for dark mode */
-  --shadow-card-var: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --shadow-glow-var: 0 0 0 3px rgba(93, 196, 145, 0.25);
+  /* Shadows — Dark Mode (lebih dalam, tidak ada glow sage hijau) */
+  --healy-shadow-card:       0 4px 24px rgba(0, 0, 0, 0.35);
+  --healy-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --healy-shadow-glow:       0 0 0 3px rgba(93, 196, 145, 0.25);
+
+  /* Native form controls (input, select, scrollbar) ikut dark mode */
+  color-scheme: dark;
 }
 
 /* ─── THEME TRANSITION (Blueprint v4.0.0 §4.4) ─── */
-/* Smooth transition saat toggle tema */
+/* Smooth transition saat toggle tema. Hanya untuk property yang relevan. */
 *,
 *::before,
 *::after {
-  transition-property: background-color, border-color, color;
+  transition-property: background-color, border-color, color, fill, stroke;
   transition-timing-function: ease;
   transition-duration: 200ms;
 }
 
-/* Kecualikan elemen yang tidak butuh transisi lama */
-button, a, input, textarea, [role="button"] {
+button, a, input, textarea, select, [role="button"] {
   transition-duration: 150ms;
 }
 
 /* ─── Base Styles ─── */
+html, body {
+  background-color: var(--healy-bg);
+  color: var(--healy-graphite);
+}
+
 body {
-  background-color: var(--color-bg);
-  color: var(--color-graphite);
-  font-family: var(--font-body-var);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 /* ─── Hexagonal Grid Background (Blueprint §3.6) ─── */
 .hero-bg {
-  background-color: var(--color-bg);
+  background-color: var(--healy-bg);
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='52' viewBox='0 0 60 52' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0 L60 17.3 L60 34.6 L30 52 L0 34.6 L0 17.3 Z' fill='none' stroke='%234CAF82' stroke-width='0.5' opacity='0.07'/%3E%3C/svg%3E");
   background-size: 60px 52px;
+}
+
+.dark .hero-bg {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='52' viewBox='0 0 60 52' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0 L60 17.3 L60 34.6 L30 52 L0 34.6 L0 17.3 Z' fill='none' stroke='%235DC491' stroke-width='0.5' opacity='0.10'/%3E%3C/svg%3E");
 }
 
 /* ─── Glass Card — Light Mode ─── */
@@ -147,14 +171,14 @@ body {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card-var);
-  box-shadow: var(--shadow-card-var);
+  border: 1px solid var(--healy-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--healy-shadow-card);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .glass-card:hover {
-  box-shadow: 0 8px 32px rgba(46, 139, 98, 0.14);
+  box-shadow: var(--healy-shadow-card-hover);
   transform: translateY(-2px);
 }
 
@@ -163,21 +187,17 @@ body {
   background: rgba(28, 43, 31, 0.85);
 }
 
-.dark .glass-card:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
 /* ─── Scrollbar styling ─── */
 ::-webkit-scrollbar {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-alt);
+  background: var(--healy-bg-alt);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: var(--healy-border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-sage);
+  background: var(--healy-sage);
 }
