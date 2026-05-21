@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* ─── Color Tokens (Blueprint §3.1) ─── */
+  /* ─── Color Tokens (Blueprint §3.1 + v4.0 Dark Mode) ─── */
   --color-healy-bg:        #F8FAFB;
   --color-healy-bg-alt:    #EFF4F2;
   --color-healy-surface:   #FFFFFF;
@@ -14,12 +14,14 @@
   --color-healy-border:    #D4E8DF;
   --color-healy-warning:   #F5A623;
   --color-healy-critical:  #E05252;
-  
+
   /* ─── Phase 10 Colors ─── */
   --color-healy-device-on: #22C55E;
   --color-healy-device-off: #EF4444;
-  --color-healy-ai-accent: #7C3AED;
-  --color-healy-ai-surface: #F5F3FF;
+
+  /* ─── v4.0.0: AI Accent — Clinical Teal (replaces Violet) ─── */
+  --color-healy-ai-accent: #0D9488;
+  --color-healy-ai-surface: #F0FDFC;
 
   /* ─── Typography (Blueprint §3.2) ─── */
   --font-display: 'Exo 2', sans-serif;
@@ -44,7 +46,7 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── CSS Custom Properties (Blueprint §3.4) ─── */
+/* ─── LIGHT MODE (Default) — CSS Custom Properties ─── */
 :root {
   --color-bg:        #F8FAFB;
   --color-bg-alt:    #EFF4F2;
@@ -59,8 +61,10 @@
   --color-critical:  #E05252;
   --color-device-on: #22C55E;
   --color-device-off:#EF4444;
-  --color-ai-accent: #7C3AED;
-  --color-ai-surface:#F5F3FF;
+
+  /* v4.0.0: AI Accent — Clinical Teal */
+  --color-ai-accent: #0D9488;
+  --color-ai-surface:#F0FDFC;
 
   --font-display-var: 'Exo 2', sans-serif;
   --font-body-var:    'DM Sans', sans-serif;
@@ -69,6 +73,57 @@
   --radius-card-var: 16px;
   --shadow-card-var: 0 4px 24px rgba(46, 139, 98, 0.08);
   --shadow-glow-var: 0 0 0 3px rgba(76, 175, 130, 0.20);
+}
+
+/* ─── DARK MODE OVERRIDES (Blueprint v4.0.0 §4.4) ─── */
+.dark {
+  /* Background — dibalik: surface lebih gelap, bukan putih */
+  --color-bg:        #0F1A14;   /* Deep Forest Dark */
+  --color-bg-alt:    #162118;   /* Slightly lighter forest */
+  --color-surface:   #1C2B1F;   /* Card surface gelap */
+
+  /* Brand — sedikit lebih terang agar kontras di dark bg */
+  --color-sage:      #5DC491;   /* Sage lebih cerah di dark */
+  --color-sage-dark: #4CAF82;   /* Hover */
+  --color-mint:      #2D6B4F;   /* Mint lebih redup */
+
+  /* Text — dibalik */
+  --color-graphite:  #E8F5EE;   /* Light sage-white untuk body text */
+  --color-slate:     #8BAF9A;   /* Muted sage untuk secondary text */
+
+  /* Border — lebih visible di dark bg */
+  --color-border:    #2A4035;
+
+  /* Status — tidak berubah, tetap bold */
+  --color-warning:   #F5A623;
+  --color-critical:  #E05252;
+
+  /* AI (Clinical Teal) — v4.0.0 */
+  --color-ai-accent: #14B8A6;   /* Teal lebih terang di dark mode */
+  --color-ai-surface:#0D2B2A;   /* Dark teal surface */
+
+  /* Device LED — tidak berubah */
+  --color-device-on:  #22C55E;
+  --color-device-off: #EF4444;
+
+  /* Shadow override for dark mode */
+  --shadow-card-var: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --shadow-glow-var: 0 0 0 3px rgba(93, 196, 145, 0.25);
+}
+
+/* ─── THEME TRANSITION (Blueprint v4.0.0 §4.4) ─── */
+/* Smooth transition saat toggle tema */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color;
+  transition-timing-function: ease;
+  transition-duration: 200ms;
+}
+
+/* Kecualikan elemen yang tidak butuh transisi lama */
+button, a, input, textarea, [role="button"] {
+  transition-duration: 150ms;
 }
 
 /* ─── Base Styles ─── */
@@ -87,7 +142,7 @@ body {
   background-size: 60px 52px;
 }
 
-/* ─── Utility Classes ─── */
+/* ─── Glass Card — Light Mode ─── */
 .glass-card {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
@@ -103,7 +158,16 @@ body {
   transform: translateY(-2px);
 }
 
-/* Scrollbar styling */
+/* ─── Glass Card — Dark Mode Override ─── */
+.dark .glass-card {
+  background: rgba(28, 43, 31, 0.85);
+}
+
+.dark .glass-card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Scrollbar styling ─── */
 ::-webkit-scrollbar {
   width: 6px;
 }

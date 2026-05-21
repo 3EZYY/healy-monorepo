@@ -36,7 +36,7 @@ export default function AlertFeed({ alerts }: AlertFeedProps) {
                 <h3 className="text-sm font-display font-semibold text-healy-warning">
                   {alert.alert_type} ({alert.value})
                 </h3>
-                <p className="text-xs font-mono text-healy-slate">
+                <p suppressHydrationWarning className="text-xs font-mono text-healy-slate">
                   {alert.timestamp.toLocaleTimeString()}
                 </p>
               </div>

@@ -71,7 +71,7 @@ export default function ConnectionStatus({ conn }: ConnectionStatusProps) {
 
       {/* Last update timestamp */}
       {conn.lastUpdate && (
-        <span className="ml-1 text-[10px] font-mono opacity-70">
+        <span suppressHydrationWarning className="ml-1 text-[10px] font-mono opacity-70">
           {conn.lastUpdate.toLocaleTimeString()}
         </span>
       )}

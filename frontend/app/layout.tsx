@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Exo_2, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const exo2 = Exo_2({
@@ -64,12 +65,16 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="id"
+      suppressHydrationWarning
       className={`${exo2.variable} ${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-healy-bg text-healy-graphite font-body">
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
 }
+

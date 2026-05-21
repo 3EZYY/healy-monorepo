@@ -657,6 +657,31 @@ const NARRATIVE_COOLDOWN_MS = 60_000
 
 ---
 
+### GOTCHA-08: Next.js Hydration Mismatch pada Format Tanggal/Waktu Dinamis
+
+**Status:** FIXED — mitigasi wajib di frontend.
+
+**Masalah:** Pemanggilan fungsi dinamis seperti `new Date().toLocaleTimeString()` di dalam Client Component Next.js yang di-SSR (Server-Side Rendered) secara default akan menghasilkan teks yang berbeda antara server (saat pre-rendering) dan client (saat hidrasi). Hal ini menghasilkan error:
+*`Hydration failed because the server rendered text didn't match the client.`*
+
+**Kenapa Terjadi:**
+1. Di server, server me-render HTML dengan string waktu saat itu (menggunakan waktu server).
+2. Di client, browser me-render ulang untuk proses hidrasi dengan string waktu timezone lokal user (misal Asia/Jakarta).
+3. Terjadi ketidakcocokan DOM *Node*.
+
+**Solusi & Mitigasi:**
+Gunakan atribut `suppressHydrationWarning` pada tag HTML pembungkus teks dinamis tersebut agar Next.js mengabaikan ketidakcocokan nilai inisial selama proses hidrasi:
+```typescript
+{conn.lastUpdate && (
+  <span suppressHydrationWarning className="ml-1 text-[10px] font-mono opacity-70">
+    {conn.lastUpdate.toLocaleTimeString()}
+  </span>
+)}
+```
+Mitigasi ini wajib diterapkan di semua komponen yang menampilkan timestamp sensor dinamis, seperti `ConnectionStatus.tsx`, `AlertFeed.tsx`, dan `dashboard/page.tsx` (`Last Update`).
+
+---
+
 ## 10. Phase 10 — AI Insight & Device Presence
 
 ### 10.1 Overview

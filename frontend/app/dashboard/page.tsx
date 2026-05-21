@@ -179,7 +179,7 @@ export default function DashboardPage() {
             ].map((info) => (
               <div key={info.label}>
                 <span className="text-xs font-body text-healy-slate block mb-1">{info.label}</span>
-                <span className="text-sm font-mono text-healy-graphite">{info.value}</span>
+                <span suppressHydrationWarning className="text-sm font-mono text-healy-graphite">{info.value}</span>
               </div>
             ))}
           </div>
