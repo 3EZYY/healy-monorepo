@@ -16,9 +16,9 @@ void setup() {
   initDisplay();
   initI2S();
   
-  // WiFi and WebSocket initialization (placeholders)
-  connectWiFi("HEALY_AP", "healy123");
-  initWebSocket("healy-server.local", 8080, "/ws");
+  // WiFi and WebSocket initialization
+  connectWiFi("Z Flip3 milik Anang", "11111111");
+  initWebSocket("10.35.96.208", 8000, "/ws/device");
 }
 
 void loop() {
