@@ -151,7 +151,7 @@ export default function NavSidebar({ onOpenChat }: NavSidebarProps) {
               onChange={(e) => setApiKey(e.target.value)}
               onBlur={handleSaveKey}
               placeholder="gsk_..."
-              className={`w-full text-xs font-mono px-3 py-2 pr-16 border rounded-lg focus:outline-none focus:ring-1 transition-colors ${
+              className={`w-full text-xs font-mono px-3 py-2 pr-16 border rounded-lg bg-healy-bg-alt text-healy-graphite placeholder:text-healy-slate focus:outline-none focus:ring-1 transition-colors ${
                 keyError ? 'border-healy-critical focus:ring-healy-critical' : 'border-healy-border focus:ring-healy-sage'
               }`}
             />

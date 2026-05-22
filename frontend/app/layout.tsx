@@ -69,7 +69,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${exo2.variable} ${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body suppressHydrationWarning className="min-h-full flex flex-col bg-healy-bg text-healy-graphite font-body">
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-healy-bg text-healy-graphite font-body antialiased transition-colors duration-200">
         <Providers>
           {children}
         </Providers>

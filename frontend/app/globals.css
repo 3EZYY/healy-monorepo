@@ -1,42 +1,37 @@
 @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap');
 @import "tailwindcss";
 
-/* ─── Custom Variant: Enable .dark class strategy for Tailwind v4 ─── */
-@custom-variant dark (&:where(.dark, .dark *));
+/* ════════════════════════════════════════════════════════════════════
+   HEALY Design System — Tailwind CSS v4 Architecture
+   ════════════════════════════════════════════════════════════════════
+   Pola resmi v4 untuk dynamic dark mode dengan custom tokens:
+   1. @theme: map healy-* tokens → var(--theme-*) reference (DINAMIS)
+   2. @custom-variant dark: aktifkan strategi .dark class
+   3. @layer base :root  → palet light mode (default)
+   4. @layer base .dark  → override palet dark mode
+   ════════════════════════════════════════════════════════════════════ */
 
-/*
-  Tailwind v4 Theme Tokens
-  ────────────────────────
-  Menggunakan @theme inline + var(...) reference agar Tailwind utilities
-  (e.g. bg-healy-bg) bisa berubah dinamis saat .dark class aktif di <html>.
-  
-  Catatan penting Tailwind v4:
-  - @theme (default/static) → tokens resolve at build time, TIDAK dinamis
-  - @theme inline           → tokens resolve di runtime via var(...) reference, DINAMIS ✅
-  
-  Ini adalah pola resmi dari Tailwind v4 docs untuk dark mode dengan custom tokens.
-*/
-@theme inline {
-  /* ─── Color Tokens (Reference ke CSS variables di :root / .dark) ─── */
-  --color-healy-bg:         var(--healy-bg);
-  --color-healy-bg-alt:     var(--healy-bg-alt);
-  --color-healy-surface:    var(--healy-surface);
-  --color-healy-sage:       var(--healy-sage);
-  --color-healy-sage-dark:  var(--healy-sage-dark);
-  --color-healy-mint:       var(--healy-mint);
-  --color-healy-graphite:   var(--healy-graphite);
-  --color-healy-slate:      var(--healy-slate);
-  --color-healy-border:     var(--healy-border);
-  --color-healy-warning:    var(--healy-warning);
-  --color-healy-critical:   var(--healy-critical);
+@theme {
+  /* ─── Color Tokens — reference ke CSS variables (resolve at runtime) ─── */
+  --color-healy-bg:         var(--theme-bg);
+  --color-healy-bg-alt:     var(--theme-bg-alt);
+  --color-healy-surface:    var(--theme-surface);
+  --color-healy-graphite:   var(--theme-graphite);
+  --color-healy-slate:      var(--theme-slate);
+  --color-healy-sage:       var(--theme-sage);
+  --color-healy-sage-dark:  var(--theme-sage-dark);
+  --color-healy-mint:       var(--theme-mint);
+  --color-healy-border:     var(--theme-border);
+  --color-healy-warning:    var(--theme-warning);
+  --color-healy-critical:   var(--theme-critical);
 
-  /* Phase 10 Colors */
-  --color-healy-device-on:  var(--healy-device-on);
-  --color-healy-device-off: var(--healy-device-off);
+  /* Phase 10 — Device LED */
+  --color-healy-device-on:  var(--theme-device-on);
+  --color-healy-device-off: var(--theme-device-off);
 
-  /* v4.0.0: AI Accent — Clinical Teal (replaces Violet) */
-  --color-healy-ai-accent:  var(--healy-ai-accent);
-  --color-healy-ai-surface: var(--healy-ai-surface);
+  /* v4.0.0 — AI Accent (Clinical Teal) */
+  --color-healy-ai-accent:  var(--theme-ai-accent);
+  --color-healy-ai-surface: var(--theme-ai-surface);
 
   /* ─── Typography (Blueprint §3.2) ─── */
   --font-display: 'Exo 2', sans-serif;
@@ -46,91 +41,98 @@
   /* ─── Border Radius ─── */
   --radius-card: 16px;
 
-  /* ─── Box Shadows (Blueprint §3.3) — reference CSS var supaya bisa di-override di dark ─── */
-  --shadow-card:       var(--healy-shadow-card);
-  --shadow-card-hover: var(--healy-shadow-card-hover);
-  --shadow-glow:       var(--healy-shadow-glow);
+  /* ─── Box Shadows — reference CSS var supaya bisa di-override di dark ─── */
+  --shadow-card:       var(--theme-shadow-card);
+  --shadow-card-hover: var(--theme-shadow-card-hover);
+  --shadow-glow:       var(--theme-shadow-glow);
 
   /* ─── Animations (Blueprint §3.5) ─── */
   --animate-pulse-critical: pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-fade-up: fadeUp 0.3s ease-out forwards;
 }
 
+/* ─── Custom Variant: aktifkan .dark class strategy untuk Tailwind v4 ─── */
+@custom-variant dark (&:is(.dark *));
+
 @keyframes fadeUp {
   0%   { opacity: 0; transform: translateY(12px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── LIGHT MODE (Default) ─── */
-:root {
-  --healy-bg:         #F8FAFB;
-  --healy-bg-alt:     #EFF4F2;
-  --healy-surface:    #FFFFFF;
-  --healy-sage:       #4CAF82;
-  --healy-sage-dark:  #2E8B62;
-  --healy-mint:       #A8DFCC;
-  --healy-graphite:   #1A2633;
-  --healy-slate:      #5A7080;
-  --healy-border:     #D4E8DF;
-  --healy-warning:    #F5A623;
-  --healy-critical:   #E05252;
+@layer base {
+  /* ════════════════════════════════════════════════════════════════
+     LIGHT MODE (Default) — Glacial White + Sage Green
+     ════════════════════════════════════════════════════════════════ */
+  :root {
+    --theme-bg:         #F8FAFB;   /* Glacial White */
+    --theme-bg-alt:     #EFF4F2;   /* Soft Mist */
+    --theme-surface:    #FFFFFF;   /* Ice White */
+    --theme-graphite:   #1A2633;   /* Body text */
+    --theme-slate:      #5A7080;   /* Secondary text */
+    --theme-sage:       #4CAF82;   /* Brand Primary */
+    --theme-sage-dark:  #2E8B62;   /* Hover */
+    --theme-mint:       #A8DFCC;   /* Brand Accent */
+    --theme-border:     #D4E8DF;   /* Pale Sage */
+    --theme-warning:    #F5A623;   /* Amber Soft */
+    --theme-critical:   #E05252;   /* Coral Red */
 
-  /* Phase 10 — Device LED */
-  --healy-device-on:  #22C55E;
-  --healy-device-off: #EF4444;
+    /* Phase 10 — Device LED */
+    --theme-device-on:  #22C55E;
+    --theme-device-off: #EF4444;
 
-  /* v4.0.0 — AI Accent (Clinical Teal) */
-  --healy-ai-accent:  #0D9488;
-  --healy-ai-surface: #F0FDFC;
+    /* v4.0.0 — AI Clinical Teal */
+    --theme-ai-accent:  #0D9488;
+    --theme-ai-surface: #F0FDFC;
 
-  /* Shadows — Light Mode */
-  --healy-shadow-card:       0 4px 24px rgba(46, 139, 98, 0.08);
-  --healy-shadow-card-hover: 0 8px 32px rgba(46, 139, 98, 0.14);
-  --healy-shadow-glow:       0 0 0 3px rgba(76, 175, 130, 0.20);
+    /* Shadows — Light Mode (sage green glow) */
+    --theme-shadow-card:       0 4px 24px rgba(46, 139, 98, 0.08);
+    --theme-shadow-card-hover: 0 8px 32px rgba(46, 139, 98, 0.14);
+    --theme-shadow-glow:       0 0 0 3px rgba(76, 175, 130, 0.20);
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     DARK MODE — Deep Forest + Cerah Sage
+     Aktif saat <html class="dark"> di-set oleh next-themes
+     ════════════════════════════════════════════════════════════════ */
+  .dark {
+    color-scheme: dark;             /* native form controls + scrollbar OS */
+
+    --theme-bg:         #0F1A14;    /* Deep Forest Dark */
+    --theme-bg-alt:     #162118;    /* Slightly lighter forest */
+    --theme-surface:    #1C2B1F;    /* Card surface gelap */
+    --theme-graphite:   #E8F5EE;    /* Light sage-white untuk body text */
+    --theme-slate:      #8BAF9A;    /* Muted sage untuk secondary text */
+    --theme-sage:       #5DC491;    /* Sage lebih cerah supaya pop */
+    --theme-sage-dark:  #4CAF82;    /* Hover (sage original) */
+    --theme-mint:       #2D6B4F;    /* Mint lebih redup */
+    --theme-border:     #2A4035;    /* Border lebih visible di dark bg */
+    --theme-warning:    #F5A623;    /* tetap bold */
+    --theme-critical:   #E05252;    /* tetap bold */
+
+    /* Phase 10 — Device LED tidak berubah */
+    --theme-device-on:  #22C55E;
+    --theme-device-off: #EF4444;
+
+    /* v4.0.0 — AI Clinical Teal (lebih terang di dark) */
+    --theme-ai-accent:  #14B8A6;
+    --theme-ai-surface: #0D2B2A;
+
+    /* Shadows — Dark Mode (pure black, tanpa glow sage) */
+    --theme-shadow-card:       0 4px 24px rgba(0, 0, 0, 0.35);
+    --theme-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.45);
+    --theme-shadow-glow:       0 0 0 3px rgba(93, 196, 145, 0.25);
+  }
+
+  /* ─── Base body styles ─── */
+  body {
+    @apply bg-healy-bg text-healy-graphite font-body antialiased transition-colors duration-200;
+  }
 }
 
-/* ─── DARK MODE OVERRIDES (Blueprint v4.0.0 §4.4) ─── */
-.dark {
-  /* Background — surface lebih gelap, dibalik dari putih */
-  --healy-bg:        #0F1A14;   /* Deep Forest Dark */
-  --healy-bg-alt:    #162118;   /* Slightly lighter forest */
-  --healy-surface:   #1C2B1F;   /* Card surface gelap */
-
-  /* Brand — sedikit lebih terang agar kontras di dark bg */
-  --healy-sage:      #5DC491;   /* Sage lebih cerah di dark */
-  --healy-sage-dark: #4CAF82;   /* Hover */
-  --healy-mint:      #2D6B4F;   /* Mint lebih redup */
-
-  /* Text — dibalik */
-  --healy-graphite:  #E8F5EE;   /* Light sage-white untuk body text */
-  --healy-slate:     #8BAF9A;   /* Muted sage untuk secondary text */
-
-  /* Border — lebih visible di dark bg */
-  --healy-border:    #2A4035;
-
-  /* Status — tidak berubah, tetap bold */
-  --healy-warning:   #F5A623;
-  --healy-critical:  #E05252;
-
-  /* AI (Clinical Teal) — v4.0.0 */
-  --healy-ai-accent:  #14B8A6;   /* Teal lebih terang di dark mode */
-  --healy-ai-surface: #0D2B2A;   /* Dark teal surface */
-
-  /* Device LED — tidak berubah */
-  --healy-device-on:  #22C55E;
-  --healy-device-off: #EF4444;
-
-  /* Shadows — Dark Mode (lebih dalam, tidak ada glow sage hijau) */
-  --healy-shadow-card:       0 4px 24px rgba(0, 0, 0, 0.35);
-  --healy-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.45);
-  --healy-shadow-glow:       0 0 0 3px rgba(93, 196, 145, 0.25);
-
-  /* Native form controls (input, select, scrollbar) ikut dark mode */
-  color-scheme: dark;
-}
-
-/* ─── THEME TRANSITION (Blueprint v4.0.0 §4.4) ─── */
-/* Smooth transition saat toggle tema. Hanya untuk property yang relevan. */
+/* ════════════════════════════════════════════════════════════════════
+   THEME TRANSITION GLOBAL
+   Smooth transition untuk semua property warna saat toggle tema
+   ════════════════════════════════════════════════════════════════════ */
 *,
 *::before,
 *::after {
@@ -143,21 +145,13 @@ button, a, input, textarea, select, [role="button"] {
   transition-duration: 150ms;
 }
 
-/* ─── Base Styles ─── */
-html, body {
-  background-color: var(--healy-bg);
-  color: var(--healy-graphite);
-}
-
-body {
-  font-family: var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+/* ════════════════════════════════════════════════════════════════════
+   Component Utilities
+   ════════════════════════════════════════════════════════════════════ */
 
 /* ─── Hexagonal Grid Background (Blueprint §3.6) ─── */
 .hero-bg {
-  background-color: var(--healy-bg);
+  background-color: var(--theme-bg);
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='52' viewBox='0 0 60 52' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0 L60 17.3 L60 34.6 L30 52 L0 34.6 L0 17.3 Z' fill='none' stroke='%234CAF82' stroke-width='0.5' opacity='0.07'/%3E%3C/svg%3E");
   background-size: 60px 52px;
 }
@@ -171,18 +165,18 @@ body {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--healy-border);
+  border: 1px solid var(--theme-border);
   border-radius: var(--radius-card);
-  box-shadow: var(--healy-shadow-card);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: var(--theme-shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
 }
 
 .glass-card:hover {
-  box-shadow: var(--healy-shadow-card-hover);
+  box-shadow: var(--theme-shadow-card-hover);
   transform: translateY(-2px);
 }
 
-/* ─── Glass Card — Dark Mode Override ─── */
+/* ─── Glass Card — Dark Mode ─── */
 .dark .glass-card {
   background: rgba(28, 43, 31, 0.85);
 }
@@ -192,12 +186,12 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--healy-bg-alt);
+  background: var(--theme-bg-alt);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--healy-border);
+  background: var(--theme-border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--healy-sage);
+  background: var(--theme-sage);
 }
