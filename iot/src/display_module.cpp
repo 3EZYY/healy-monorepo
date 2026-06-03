@@ -1,23 +1,26 @@
 #include "display_module.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
+#include <Adafruit_SSD1306.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define i2c_Address 0x3c // SH1106 default address
 
-Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 void initDisplay() {
-  display.begin(i2c_Address, true); // true = reset
+  Serial.println("Init OLED...");
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { Serial.println("SSD1306 allocation failed"); return; }
+  Serial.println("OLED Init OK");
   display.clearDisplay();
-  display.setTextColor(SH110X_WHITE);
+  display.setTextColor(SSD1306_WHITE);
   display.display();
 }
 
 void updateDisplay(float temp, int bpm, int spo2) {
   display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
   
   display.setTextSize(1);
   display.setCursor(0, 0);
