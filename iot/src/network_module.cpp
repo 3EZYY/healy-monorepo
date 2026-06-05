@@ -4,6 +4,10 @@
 #include <WebSocketsClient.h>
 #include <string.h>
 
+// Konfigurasi WebSocket Lokal (Update)
+const char* websocket_host = "192.168.1.2";
+const uint16_t websocket_port = 8080;
+
 WebSocketsClient webSocket;
 const char* currentSsid;
 const char* currentPassword;
@@ -79,8 +83,10 @@ void connectWiFi(const char* ssid, const char* password) {
   }
 }
 
+// Gunakan parameter const char* path (misalnya "/ws/device") saat pemanggilan di main.cpp
 void initWebSocket(const char* host, uint16_t port, const char* path) {
-  webSocket.begin(host, port, path);
+  // Overriding parameter host dan port dengan konfigurasi lokal
+  webSocket.begin(websocket_host, websocket_port, path);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 }
