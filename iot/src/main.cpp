@@ -49,7 +49,8 @@ static void sensorDisplayTask(void* pvParameters) {
   }
 }
 
-// Core 0: WiFi reconnect guard + webSocket.loop() + telemetry dispatch
+// Core 0: WiFi guard + webSocket.loop() + telemetry dispatch + mic uplink.
+// ALL webSocket I/O lives here so the non-reentrant client has a single owner.
 static void networkTask(void* pvParameters) {
   TelemetryMsg_t msg;
 
@@ -60,15 +61,18 @@ static void networkTask(void* pvParameters) {
       sendTelemetry(msg.json);
     }
 
-    vTaskDelay(pdMS_TO_TICKS(10));
+    networkAudioPump();  // drain captured mic PCM -> webSocket.sendBIN()
+
+    vTaskDelay(pdMS_TO_TICKS(5));  // tighter loop keeps PTT latency low
   }
 }
 
-// Core 0: I2S audio loopback — i2s_read blocks on DMA internally, isolated here
+// Core 0: I2S owner. Captures mic (when recording) or plays TTS downlink.
+// ALL i2s_read/i2s_write happens here; stream buffers bridge to networkTask.
 static void audioTask(void* pvParameters) {
   for (;;) {
-    loopbackTest();
-    vTaskDelay(pdMS_TO_TICKS(10));  // mandatory WDT feed; also yields if i2s_read returns fast
+    audioServiceLoop();
+    vTaskDelay(pdMS_TO_TICKS(5));  // WDT feed + yield
   }
 }
 
@@ -104,7 +108,7 @@ void setup() {
 
   xTaskCreatePinnedToCore(sensorDisplayTask, "SensorDisplay", 8192, NULL, 2, NULL, 1);
   xTaskCreatePinnedToCore(networkTask,       "Network",       8192, NULL, 1, NULL, 0);
-  xTaskCreatePinnedToCore(audioTask,         "Audio",         4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(audioTask,         "Audio",         6144, NULL, 1, NULL, 0);
 }
 
 void loop() {
