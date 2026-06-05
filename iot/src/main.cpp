@@ -1,23 +1,86 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
 #include "sensor_module.h"
 #include "display_module.h"
 #include "network_module.h"
 #include "audio_module.h"
 
-unsigned long previousMillis = 0;
-const long interval = 1000;
+#define TELEMETRY_QUEUE_LEN  5
+#define JSON_BUF_SIZE        128
+
+typedef struct {
+  char json[JSON_BUF_SIZE];
+} TelemetryMsg_t;
+
+static QueueHandle_t telemetryQueue;
+
+// Core 1: non-blocking MAX30102 poll at ~200Hz; display + telemetry queued every 1s
+static void sensorDisplayTask(void* pvParameters) {
+  TickType_t lastDisplayTick = xTaskGetTickCount();
+  const TickType_t displayInterval = pdMS_TO_TICKS(1000);
+
+  for (;;) {
+    updateSensors();  // drains MAX30102 FIFO — non-blocking
+
+    if ((xTaskGetTickCount() - lastDisplayTick) >= displayInterval) {
+      lastDisplayTick += displayInterval;  // drift-free 1s cadence
+
+      float temp = getTemperature();  // MLX90614 I2C read
+      int   bpm  = getBPM();
+      int   spo2 = getSpO2();
+
+      updateDisplay(temp, bpm, spo2, isFingerPresent(), isAdjustNeeded());  // SSD1306 I2C update
+
+      TelemetryMsg_t msg;
+      JsonDocument doc;
+      doc["temp"]   = temp;
+      doc["bpm"]    = bpm;
+      doc["spo2"]   = spo2;
+      doc["status"] = "online";
+      serializeJson(doc, msg.json, JSON_BUF_SIZE);
+      xQueueSend(telemetryQueue, &msg, 0);  // non-blocking enqueue
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+}
+
+// Core 0: WiFi reconnect guard + webSocket.loop() + telemetry dispatch
+static void networkTask(void* pvParameters) {
+  TelemetryMsg_t msg;
+
+  for (;;) {
+    networkLoop();  // WiFi guard + webSocket.loop()
+
+    if (xQueueReceive(telemetryQueue, &msg, 0) == pdTRUE) {
+      sendTelemetry(msg.json);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+// Core 0: I2S audio loopback — i2s_read blocks on DMA internally, isolated here
+static void audioTask(void* pvParameters) {
+  for (;;) {
+    loopbackTest();
+    vTaskDelay(pdMS_TO_TICKS(10));  // mandatory WDT feed; also yields if i2s_read returns fast
+  }
+}
 
 void setup() {
   Serial.begin(115200);
-  
-  // WiFi and WebSocket initialization
-  connectWiFi("iPhone Rafif", "CUKURUKUK");
+
+  connectWiFi("ATAR ATAS", "atar1234");
   initWebSocket("10.35.96.208", 8000, "/ws/device");
 
   Wire.begin(21, 22);
-  
+  Wire.setClock(100000);  // Standard Mode (100kHz) — clone OLEDs are unstable at 400kHz
+
   Serial.println("Scanning I2C bus...");
   int deviceCount = 0;
   for (byte address = 1; address < 127; address++) {
@@ -31,43 +94,19 @@ void setup() {
   if (deviceCount == 0) {
     Serial.println("No I2C devices found. Check wiring or hardware!");
   }
-  
-  // Initialize subsystems
+
   initSensors();
   initDisplay();
   initI2S();
+
+  telemetryQueue = xQueueCreate(TELEMETRY_QUEUE_LEN, sizeof(TelemetryMsg_t));
+  configASSERT(telemetryQueue);
+
+  xTaskCreatePinnedToCore(sensorDisplayTask, "SensorDisplay", 8192, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(networkTask,       "Network",       8192, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(audioTask,         "Audio",         4096, NULL, 1, NULL, 0);
 }
 
 void loop() {
-  // Continuous non-blocking tasks
-  networkLoop();
-  loopbackTest();
-  updateSensors();
-  
-  unsigned long currentMillis = millis();
-  
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    
-    // 1) Fetch live sensor readings
-    float temp = getTemperature();
-    int bpm = getBPM();
-    int spo2 = getSpO2();
-    
-    // 2) Update local OLED display
-    Serial.println("Drawing to OLED...");
-    updateDisplay(temp, bpm, spo2);
-    
-    // 3) Create JSON payload
-    JsonDocument doc;
-    doc["temp"] = temp;
-    doc["bpm"] = bpm;
-    doc["spo2"] = spo2;
-    doc["status"] = "online";
-    
-    // 4) Serialize and send telemetry via WebSocket
-    String jsonString;
-    serializeJson(doc, jsonString);
-    sendTelemetry(jsonString);
-  }
+  vTaskDelete(NULL);  // Arduino loop task deleted — all work is in FreeRTOS tasks above
 }

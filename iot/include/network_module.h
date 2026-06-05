@@ -5,7 +5,7 @@
 
 void connectWiFi(const char* ssid, const char* password);
 void initWebSocket(const char* host, uint16_t port, const char* path);
-void sendTelemetry(String jsonPayload);
+void sendTelemetry(const char* jsonPayload);
 void networkLoop();
 
 #endif

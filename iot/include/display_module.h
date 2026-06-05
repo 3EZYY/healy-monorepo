@@ -2,6 +2,6 @@
 #define DISPLAY_MODULE_H
 
 void initDisplay();
-void updateDisplay(float temp, int bpm, int spo2);
+void updateDisplay(float temp, int bpm, int spo2, bool fingerPresent, bool adjustNeeded);
 
 #endif

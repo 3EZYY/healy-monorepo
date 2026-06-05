@@ -61,7 +61,7 @@ void initWebSocket(const char* host, uint16_t port, const char* path) {
   webSocket.setReconnectInterval(5000);
 }
 
-void sendTelemetry(String jsonPayload) {
+void sendTelemetry(const char* jsonPayload) {
   webSocket.sendTXT(jsonPayload);
 }
 
