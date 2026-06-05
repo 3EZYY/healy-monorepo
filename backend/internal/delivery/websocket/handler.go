@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/rafif/healy-backend/internal/service/voice"
 	"github.com/rafif/healy-backend/internal/usecase"
 )
 
@@ -18,7 +19,7 @@ var upgrader = websocket.Upgrader{
 }
 
 // ServeDeviceWs handles websocket requests from the ESP32 devices.
-func ServeDeviceWs(hub *Hub, telemetryUsecase usecase.TelemetryUsecase, w http.ResponseWriter, r *http.Request) {
+func ServeDeviceWs(hub *Hub, telemetryUsecase usecase.TelemetryUsecase, voiceSvc *voice.Service, w http.ResponseWriter, r *http.Request) {
 	// The device_id should be extracted from the header as per blueprint
 	deviceID := r.Header.Get("device_id")
 	if deviceID == "" {
@@ -40,9 +41,11 @@ func ServeDeviceWs(hub *Hub, telemetryUsecase usecase.TelemetryUsecase, w http.R
 		hub:              hub,
 		conn:             conn,
 		send:             make(chan []byte, 256),
+		sendBinary:       make(chan []byte, 128), // TTS PCM frames downlink
 		IsDevice:         true,
 		DeviceID:         deviceID,
 		TelemetryUsecase: telemetryUsecase,
+		Voice:            voiceSvc,
 	}
 
 	client.hub.RegisterDevice <- client
@@ -54,7 +57,7 @@ func ServeDeviceWs(hub *Hub, telemetryUsecase usecase.TelemetryUsecase, w http.R
 }
 
 // ServeViewerWs handles websocket requests from the frontend viewers.
-func ServeViewerWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func ServeViewerWs(hub *Hub, voiceSvc *voice.Service, w http.ResponseWriter, r *http.Request) {
 	// Assume JWT validation happened in middleware before reaching this handler
 	// Or validate JWT from query param if required
 
@@ -65,10 +68,12 @@ func ServeViewerWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{
-		hub:      hub,
-		conn:     conn,
-		send:     make(chan []byte, 256),
-		IsDevice: false,
+		hub:        hub,
+		conn:       conn,
+		send:       make(chan []byte, 256),
+		sendBinary: make(chan []byte, 1), // viewers don't receive binary; kept non-nil
+		IsDevice:   false,
+		Voice:      voiceSvc, // enables PTT command handling
 	}
 
 	client.hub.RegisterViewer <- client

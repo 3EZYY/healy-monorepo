@@ -13,6 +13,7 @@ import (
 	"github.com/rafif/healy-backend/internal/delivery/websocket"
 	deliveryHttp "github.com/rafif/healy-backend/internal/delivery/http"
 	"github.com/rafif/healy-backend/internal/repository/postgres"
+	"github.com/rafif/healy-backend/internal/service/voice"
 	"github.com/rafif/healy-backend/internal/usecase"
 	"github.com/rafif/healy-backend/pkg/config"
 	"github.com/rafif/healy-backend/pkg/database"
@@ -55,11 +56,19 @@ func main() {
 	telemetryUsecase := usecase.NewTelemetryUsecase(telemetryRepo, hub.Broadcast)
 	authUsecase := usecase.NewAuthUsecase(userRepo, tokenGenerator)
 
+	// 7b. Initialize AI Voice Assistant pipeline (Groq STT + Gemini reason/TTS)
+	voiceSvc := voice.NewService(cfg.GroqAPIKey, cfg.GeminiAPIKey)
+	if voiceSvc.Enabled() {
+		log.Println("Voice assistant enabled (Groq Whisper + Gemini TTS)")
+	} else {
+		log.Println("Voice assistant DISABLED — set GROQ_API_KEY and GEMINI_API_KEY to enable")
+	}
+
 	// 8. Initialize Delivery (HTTP Router)
 	// Pass tokenGenerator, telemetryRepo, and settingsRepo for full DI
 	router := deliveryHttp.SetupRouter(
 		cfg, hub, telemetryUsecase, authUsecase,
-		tokenGenerator, telemetryRepo, settingsRepo,
+		tokenGenerator, telemetryRepo, settingsRepo, voiceSvc,
 	)
 
 	// 9. Setup Server

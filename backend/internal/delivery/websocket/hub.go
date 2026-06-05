@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"log"
+	"sync/atomic"
 )
 
 // SystemMessage is a non-telemetry message sent from Hub to Frontend
@@ -29,6 +30,17 @@ type Hub struct {
 	// Unregister requests from clients.
 	UnregisterViewer chan *Client
 	UnregisterDevice chan *Client
+
+	// currentDevice points at the most recently registered ESP32 (the PTT target).
+	// Stored atomically so viewer goroutines can read it without racing the
+	// single-threaded Run() loop that owns the deviceClients map.
+	currentDevice atomic.Pointer[Client]
+}
+
+// CurrentDevice returns the active ESP32 client, or nil if none is connected.
+// Safe to call from any goroutine (e.g. a viewer's ReadPump handling PTT).
+func (h *Hub) CurrentDevice() *Client {
+	return h.currentDevice.Load()
 }
 
 func NewHub() *Hub {
@@ -81,6 +93,7 @@ func (h *Hub) Run() {
 
 		case client := <-h.RegisterDevice:
 			h.deviceClients[client] = true
+			h.currentDevice.Store(client) // PTT target = latest device
 			log.Printf("Device client registered: %s\n", client.DeviceID)
 			// Broadcast to all viewers: ESP32 is online
 			h.broadcastSystem("device_connected")
@@ -89,7 +102,12 @@ func (h *Hub) Run() {
 			if _, ok := h.deviceClients[client]; ok {
 				delete(h.deviceClients, client)
 				close(client.send)
+				close(client.sendBinary)
 				log.Printf("Device client unregistered: %s\n", client.DeviceID)
+			}
+			// Clear the PTT target if this was the active device.
+			if h.currentDevice.Load() == client {
+				h.currentDevice.Store(nil)
 			}
 			// Broadcast to all viewers: ESP32 offline if no devices left
 			if len(h.deviceClients) == 0 {

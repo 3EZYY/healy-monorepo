@@ -18,6 +18,10 @@ type Config struct {
 	CORSAllowedOrigins []string
 	WSDevicePath       string
 	WSClientPath       string
+
+	// AI Voice Assistant (free-tier multimodal stack)
+	GroqAPIKey   string // Groq Whisper STT
+	GeminiAPIKey string // Google Gemini reasoning + native TTS
 }
 
 func LoadConfig() *Config {
@@ -41,6 +45,9 @@ func LoadConfig() *Config {
 		CORSAllowedOrigins: corsOrigins,
 		WSDevicePath:       getEnv("WS_DEVICE_PATH", "/ws/device"),
 		WSClientPath:       getEnv("WS_CLIENT_PATH", "/ws/telemetry"),
+
+		GroqAPIKey:   getEnv("GROQ_API_KEY", ""),
+		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 	}
 
 	// Strict validation for critical fields

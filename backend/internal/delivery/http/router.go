@@ -10,6 +10,7 @@ import (
 	"github.com/rafif/healy-backend/internal/delivery/websocket"
 	"github.com/rafif/healy-backend/internal/domain"
 	"github.com/rafif/healy-backend/internal/repository/interfaces"
+	"github.com/rafif/healy-backend/internal/service/voice"
 	"github.com/rafif/healy-backend/internal/usecase"
 	"github.com/rafif/healy-backend/pkg/config"
 	"github.com/rafif/healy-backend/pkg/jwt"
@@ -26,6 +27,7 @@ func SetupRouter(
 	tokenGenerator jwt.TokenGenerator,
 	telemetryRepo interfaces.TelemetryRepository,
 	settingsRepo interfaces.SettingsRepository,
+	voiceSvc *voice.Service,
 ) *gin.Engine {
 	r := gin.Default()
 
@@ -120,15 +122,18 @@ func SetupRouter(
 	// WebSocket endpoints
 	ws := r.Group("/ws")
 	{
-		ws.GET("/telemetry", func(c *gin.Context) {
+		viewerHandler := func(c *gin.Context) {
 			// JWT should ideally be validated here using token from query param
 			// e.g. token := c.Query("token")
-			websocket.ServeViewerWs(hub, c.Writer, c.Request)
-		})
+			websocket.ServeViewerWs(hub, voiceSvc, c.Writer, c.Request)
+		}
+		ws.GET("/telemetry", viewerHandler)
+		// Alias: the frontend's useTelemetry/useVoiceAssistant connect to /ws/viewer.
+		ws.GET("/viewer", viewerHandler)
 
 		ws.GET("/device", func(c *gin.Context) {
 			// device_id is expected in header
-			websocket.ServeDeviceWs(hub, telemetryUsecase, c.Writer, c.Request)
+			websocket.ServeDeviceWs(hub, telemetryUsecase, voiceSvc, c.Writer, c.Request)
 		})
 	}
 
