@@ -1818,3 +1818,344 @@ streaming text appears character by character, abort works on panel close.
 *HEALY Master Blueprint v4.0.0 — Revised by Senior Full-Stack Engineer & Technical Product Manager.*
 *F-01: Light/Dark Mode | F-02: Clinical Teal AI Accent | F-03: Separated History Charts | F-04: Context-Aware AI Chatbot*
 *Dokumen ini adalah master reference aktif. v3.0.0 dinyatakan deprecated.*
+
+---
+
+## 14. IoT Firmware — Status & Changelog
+
+> **Scope:** Layer ESP32 (`/iot` folder, PlatformIO, framework Arduino).
+> Section ini mencatat semua perbaikan firmware yang dilakukan secara iteratif.
+> **Last Updated:** 2026-06-05
+
+---
+
+### 14.1 Status Hardware
+
+| Komponen | Status | Catatan |
+|---|---|---|
+| ESP32 DOIT DevKit v1 | ✅ Online | Core 0: Network + Audio. Core 1: Sensor + Display |
+| SSD1306 OLED 128×64 | ✅ Aktif | I2C 0x3C, 100kHz Standard Mode |
+| MLX90614 (Suhu) | ✅ Aktif | I2C, data suhu tampil di OLED |
+| MAX30102 (BPM/SpO2) | ✅ Aktif | I2C, finger detection bekerja, BPM & SpO2 tampil di OLED |
+| I2S Microphone | ✅ Init | Loopback test berjalan di audioTask |
+| WebSocket ke Backend | ✅ Terhubung | Host `10.35.96.208:8000/ws/device` |
+
+---
+
+### 14.2 Arsitektur Firmware (FreeRTOS Tasks)
+
+| Task | Core | Stack | Prioritas | Fungsi |
+|---|---|---|---|---|
+| `sensorDisplayTask` | 1 | 8192 B | 2 | Poll MAX30102 FIFO, baca MLX90614, update OLED setiap 1s |
+| `networkTask` | 0 | 8192 B | 1 | WiFi reconnect guard, `webSocket.loop()`, kirim telemetri |
+| `audioTask` | 0 | 4096 B | 1 | I2S loopback read/write |
+
+---
+
+### 14.3 Changelog Firmware — Iterasi Debugging
+
+#### Iterasi 1 — OLED Mati Total
+**Root Cause:**
+- `Wire.begin()` dipanggil 2x (di `setup()` dan di `initSensors()`) → reset I2C bus
+- `particleSensor.begin(Wire, I2C_SPEED_FAST)` di dalam library SparkFun memanggil `Wire.setClock(400000)` secara internal, meng-override setting manual → `display.begin()` jalan di 400kHz → clone OLED gagal
+- `display.begin()` return `false` tapi tidak ada guard → `updateDisplay()` akses `buffer = nullptr` → core panic
+
+**Fix yang Diterapkan (`display_module.cpp`, `sensor_module.cpp`, `main.cpp`):**
+- Tambah `static bool displayOk` flag; semua panggilan `display.*` di-guard dengan flag ini
+- Hapus `Wire.begin()` dari `initSensors()` — Wire diinisialisasi sekali di `setup()`
+- Ubah `particleSensor.begin(Wire, I2C_SPEED_FAST)` → `particleSensor.begin(Wire, I2C_SPEED_STANDARD)` agar library tidak override clock ke 400kHz
+- `Wire.setClock(100000)` di `setup()` — satu titik kontrol, sebelum semua init I2C
+
+#### Iterasi 2 — MAX30102 Spam IR=262143 & BPM=-999
+**Root Cause:**
+- IR value `0x3FFFF` (262143) = ADC saturasi/sensor tidak terkoneksi, diproses sebagai data valid
+- `heartRate = -999` dari Maxim algorithm dicetak tanpa cek validitas flag
+
+**Fix (`sensor_module.cpp`):**
+- Gate `if (irData == 0x3FFFF || redData == 0x3FFFF)` → `resetBeatState(); continue`
+- `Serial.printf` untuk BPM/SpO2 hanya jalan jika `validHeartRate == 1 && validSPO2 == 1`
+- Tambah `static bool max30102Ok` flag — jika `particleSensor.begin()` gagal, `updateSensors()` return immediately
+
+#### Iterasi 3 — BPM/SpO2 Tidak Pernah Tampil di OLED
+**Root Cause (berlapis):**
+1. **Threshold IR 50000 terlalu tinggi** untuk sensor clone — clone MAX30102 output IR ~7.000–40.000 dengan jari, selalu dianggap "No Finger"
+2. **Tidak ada debounce** — satu sampel di bawah threshold langsung `resetBeatState()`, menghapus semua `validBeats` yang sudah akumulasi
+3. **LED power 0x5A terlalu terang** — saturasi photodetector menghilangkan sinyal AC (gelombang denyut nadi) → `checkForBeat()` tidak pernah detect peak
+4. **Zero-poisoning di moving average** — `rates[4]` diinisialisasi 0; rata-rata `(82+0+0+0)/4 = 20` → BPM under-reported atau tidak update
+
+**Fix (`sensor_module.cpp`):**
+- Threshold: `irData < 50000` → `irData < 7000`
+- Debounce 500ms: `noFingerSince` variable — reset hanya jika di bawah threshold selama ≥ 500ms
+- LED power: `0x5A` → `0x1F` di `particleSensor.setup()`, `setPulseAmplitudeRed()`, `setPulseAmplitudeIR()`
+- `validBeats` counter: rata-rata hanya dihitung dari slot yang sudah terisi (`rates[0..validBeats-1]`), bukan selalu 4 slot
+- Minimum 2 valid beats sebelum `currentBPM` diupdate
+
+#### Iterasi 4 — BPM Erratik (Lonjakan 120→63→110, Asli 82 BPM)
+**Root Cause:**
+- Pola **120 dan 63** adalah artefak matematis dari `checkForBeat` pada clone sensor:
+  - Double-trigger (1 peak dihitung 2x) → delta ~500ms → **120 BPM** (≈1.5×)
+  - Missed peak (1 peak terlewat) → delta ~950ms → **63 BPM** (≈0.75×)
+- Moving average (mean) window 4 terlalu kecil dan terlalu lebar range `[20,255]` — outlier ikut dirata-rata
+
+**Fix (`sensor_module.cpp`) — 4-Stage BPM Pipeline:**
+
+| Stage | Metode | Fungsi |
+|---|---|---|
+| 1 | Range gate `[40, 180]` | Buang nilai mustahil secara fisiologis |
+| 2 | Outlier gate ±25 vs median | Aktif setelah window matang; menolak double/half-beat artifact |
+| 3 | **Median** window 9 | Inti perbaikan — median kebal outlier simetris; bahkan 4 dari 9 sampel salah, median tetap ~82 |
+| 4 | EMA 80/20 atas median | Tampilan halus, tidak loncat-loncat antar nilai diskrit |
+
+- Window enlarged: `RATE_SIZE = 4` → `RATE_SIZE = 9`
+- `MIN_BEATS_FOR_DISPLAY = 5` — EMA di-seed dari median matang (bukan beat pertama) sehingga nilai pertama yang tampil sudah akurat
+- `isAdjustNeeded()` timeout dinaikkan 5s → 8s karena window 9 butuh lebih banyak beats untuk konvergen
+
+---
+
+### 14.4 Status OLED Display
+
+**Layout Final (128×64, textSize 1):**
+```
+y= 0  "--- HEALTH DATA ---"
+y=10  ─────────────────────  (divider)
+y=13  "Temp : 36.5 C"
+y=26  "BPM  : 82 bpm"   atau  "BPM  : --"
+y=39  "SpO2 : 98 %"     atau  "SpO2 : --"
+y=50  ─────────────────────  (divider)
+y=53  [Status Footer — 4 state]
+```
+
+**Footer State Machine:**
+| Kondisi | Teks Footer |
+|---|---|
+| Tidak ada jari (IR < 7000 sustained 500ms) | `Place finger...` |
+| Jari terdeteksi, sedang konvergen (<8s) | `Measuring...` |
+| Jari ada >8s tapi tidak ada beats | `Adjust finger!` |
+| BPM valid tersedia | `Status: OK` |
+
+---
+
+### 14.5 Konfigurasi Sensor Final
+
+```cpp
+// I2C
+Wire.begin(21, 22);
+Wire.setClock(100000);  // Standard Mode — clone OLED tidak stabil di 400kHz
+
+// MAX30102
+particleSensor.begin(Wire, I2C_SPEED_STANDARD);  // library juga set clock internal
+particleSensor.setup(0x1F, 4, 2, 400, 411, 4096);
+// Power 0x1F (31/255) — cukup untuk clone, tidak saturasi
+// sampleAverage=4, sampleRate=400 → 100 eff. samples/sec ke FIFO
+particleSensor.setPulseAmplitudeRed(0x1F);
+particleSensor.setPulseAmplitudeIR(0x1F);
+```
+
+---
+
+### 14.6 Files Terdampak — IoT Layer
+
+| File | Jenis | Perubahan |
+|---|---|---|
+| `iot/src/main.cpp` | MODIFY | Single `Wire.begin()` + `Wire.setClock(100000)`, `vTaskDelay` di semua task, stack 8192 untuk `sensorDisplayTask` |
+| `iot/src/sensor_module.cpp` | MODIFY | 4-stage BPM pipeline, threshold 7000, debounce 500ms, LED power 0x1F, `max30102Ok` flag, `isFingerPresent()`, `isAdjustNeeded()` |
+| `iot/src/display_module.cpp` | MODIFY | `displayOk` guard, 4-state footer, `"--"` saat tidak ada reading, divider lines |
+| `iot/include/sensor_module.h` | MODIFY | Export `isFingerPresent()`, `isAdjustNeeded()` |
+| `iot/include/display_module.h` | MODIFY | Tambah param `bool fingerPresent, bool adjustNeeded` ke `updateDisplay()` |
+| `iot/src/network_module.cpp` | NO CHANGE | Tidak ada perubahan dari versi awal |
+| `iot/src/audio_module.cpp` | NO CHANGE | Tidak ada perubahan dari versi awal |
+
+---
+
+### 14.7 Payload Telemetri ke Backend
+
+JSON yang dikirim via WebSocket setiap 1 detik:
+```json
+{
+  "temp": 36.5,
+  "bpm": 82,
+  "spo2": 98,
+  "status": "online"
+}
+```
+Field `bpm` dan `spo2` bernilai `0` saat tidak ada jari — backend/frontend harus handle `0` sebagai "no reading", bukan nilai medis.
+
+---
+
+### 14.8 Known Issues & Next Steps IoT
+
+| # | Issue | Prioritas | Catatan |
+|---|---|---|---|
+| I-01 | SpO2 perlu ~25 detik konvergen (100 sampel batch Maxim) | LOW | Normal behaviour algoritma Maxim — bukan bug |
+| I-02 | Debug Serial prints (`[BEAT]`, `[IR]`, `[SPO2]`) masih aktif | MEDIUM | Hapus atau beri `#ifdef DEBUG` sebelum production/demo |
+| I-03 | `BPM_OUTLIER_DELTA = 25` mungkin perlu tuning per-pengguna | LOW | Naikkan ke 30 jika BPM user aktif berfluktuasi lebih dari 25 BPM antar detak |
+| I-04 | ~~Audio loopback placeholder~~ | DONE | Digantikan oleh PTT voice pipeline penuh — lihat **Section 15** |
+
+---
+
+## 15. F-05: AI Voice Assistant — 2-Way Push-to-Talk (Native Multimodal)
+
+> **Scope:** Full-stack — ESP32 (`/iot`) + Golang (`/backend`) + Next.js (`/frontend`).
+> **Stack (100% free-tier):** Groq Whisper STT · Google Gemini reasoning + native TTS.
+> **Last Updated:** 2026-06-05
+
+---
+
+### 15.1 ⚠️ Catatan Kejujuran Teknis (WAJIB DIBACA)
+
+Brief awal meminta **"Gemini 3.5 Flash"** melakukan reasoning + audio generation dalam **satu REST call** via `responseModalities:["AUDIO"]`. Ada dua koreksi penting:
+
+1. **`gemini-3.5-flash` TIDAK ADA.** Model nyata: `gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`.
+2. **Single REST call reasoning + audio tidak tersedia.** Di REST API, `responseModalities:["AUDIO"]` hanya bekerja pada **model TTS** (`gemini-2.5-flash-preview-tts`) yang **hanya menyuarakan teks**, tidak bernalar. Kombinasi reasoning + audio asli (native audio dialog) adalah **Live API** — WebSocket dua arah, preview-only, kuota free lebih ketat, jauh lebih kompleks.
+
+**Keputusan arsitektur:** dipakai **pipeline 2-tahap REST** yang robust di free-tier, dibungkus di balik satu `voice.Service.Process()`:
+
+| Tahap | Model | Fungsi |
+|---|---|---|
+| Reason | `gemini-2.5-flash` | transcript + telemetry → balasan Bahasa Indonesia ringkas |
+| Speak | `gemini-2.5-flash-preview-tts` | teks → PCM 24 kHz (honoring `responseModalities:["AUDIO"]`) |
+
+Jika nanti ingin true single-shot native audio, migrasikan tahap ini ke **Gemini Live API** (lihat 15.8).
+
+---
+
+### 15.2 Arsitektur Aliran Data (Full Loop)
+
+```
+┌─────────┐  press/hold   ┌──────────────┐  {"event":"start_audio"}  ┌──────────────┐
+│ Browser │ ────────────▶ │   Backend    │ ────────────────────────▶ │    ESP32     │
+│ (PTT    │   WS text     │  (viewer WS) │   forward ke device WS    │  mic ON      │
+│  button)│               └──────┬───────┘                           └──────┬───────┘
+└─────────┘                      │                                          │ INMP441
+     ▲                           │ buffer BinaryMessage                     │ 16k PCM
+     │ voice_state               │◀─────────────────────────────────────────┘ sendBIN(1024B)
+     │ (recording/               │
+     │  processing/      release │ {"event":"stop_audio"}
+     │  playing/idle)            ▼
+     │                  ┌─────────────────────────────────────────┐
+     │                  │  voice.Service.Process(pcm, telemetry)  │
+     │                  │  1. Groq Whisper  → transcript          │
+     │                  │  2. Gemini 2.5    → reply text (ID)      │
+     │                  │  3. Gemini TTS    → PCM 24k 16-bit mono  │
+     │                  └─────────────────────┬───────────────────┘
+     │                                        │ BinaryMessage (2048B chunks)
+     │                                        ▼
+     └────────────────────────────────  ┌──────────────┐
+        status updates to viewer        │    ESP32     │  i2s_write → MAX98357A 🔊
+                                         │  speaker     │
+                                         └──────────────┘
+```
+
+**Kunci:** PTT button ada di **browser**, tapi mic & speaker ada di **ESP32**. Backend jadi router + otak AI. Audio TTS **tidak** dikirim ke browser — diputar langsung di speaker ESP32.
+
+---
+
+### 15.3 IoT Layer (ESP32 / FreeRTOS)
+
+**Model konkurensi (anti-deadlock):**
+
+| Resource | Single Owner | Bridge |
+|---|---|---|
+| `webSocket` (non-reentrant) | **networkTask** (Core 0) | — |
+| I2S driver | **audioTask** (Core 0) | — |
+| mic PCM (uplink) | audioTask → networkTask | `uplinkSB` (FreeRTOS StreamBuffer) |
+| TTS PCM (downlink) | networkTask → audioTask | `downlinkSB` (FreeRTOS StreamBuffer) |
+
+Semua `webSocket.sendBIN()` ada di networkTask; semua `i2s_read/i2s_write` di audioTask. StreamBuffer (single-producer/single-consumer) menjembatani tanpa lock. Ini menyelesaikan hazard: `webSocket.sendBIN()` dari audioTask bersamaan `webSocket.loop()` di networkTask = crash.
+
+**Sample rate switching:** record **16 kHz** (Whisper), playback **24 kHz** (output native Gemini TTS). `i2s_set_clk()` dipanggil di `audioServiceLoop()` (audioTask) saat transisi mode.
+
+**Control protocol (backend → ESP32, WStype_TEXT):** parse ringan `strstr` (tanpa alokasi JSON di callback):
+- `start_audio` → `audioStartRecording()`
+- `stop_audio` → `audioStopRecording()`
+
+**Files:**
+| File | Perubahan |
+|---|---|
+| `iot/include/audio_module.h` | API baru: start/stop recording, enqueue downlink, read uplink chunk, `audioServiceLoop()` |
+| `iot/src/audio_module.cpp` | Rewrite: full-duplex I2S (INMP441 + MAX98357A), 2 StreamBuffer, mode switch 16k/24k. Hapus `loopbackTest` |
+| `iot/include/network_module.h` | Tambah `networkAudioPump()` |
+| `iot/src/network_module.cpp` | `WStype_TEXT` (start/stop), `WStype_BIN` → `audioEnqueueDownlink`, `networkAudioPump()` drain mic → `sendBIN` |
+| `iot/src/main.cpp` | `audioTask` → `audioServiceLoop()`, `networkTask` → `networkAudioPump()`, stack audioTask 4096→6144 |
+
+**Pin map (full-duplex, shared BCLK/WS):** WS=25, BCLK=26, DOUT(→MAX98357A)=23, DIN(←INMP441)=32. INMP441 mono → `I2S_CHANNEL_FMT_ONLY_LEFT` (L/R pin ke GND).
+
+---
+
+### 15.4 Backend Layer (Golang)
+
+**Package baru `internal/service/voice/`:**
+| File | Isi |
+|---|---|
+| `voice.go` | Orchestrator `Service.Process()` + WAV header (44-byte, 16k/16-bit/mono) + design note |
+| `groq.go` | Whisper STT — `whisper-large-v3`, multipart/form-data, `language=id` |
+| `gemini.go` | Reasoning (`gemini-2.5-flash`) + TTS (`gemini-2.5-flash-preview-tts`, `responseModalities:["AUDIO"]`) |
+
+**WebSocket routing (`internal/delivery/websocket/`):**
+| File | Perubahan |
+|---|---|
+| `client.go` | Pisah `BinaryMessage` (mic PCM) vs `TextMessage` (telemetry/command); audio buffer + `sync.Mutex`; channel `sendBinary` terpisah (text di-newline-join akan korup binary); handler PTT command + goroutine `processVoiceTurn`; `maxMessageSize` 1024→8192; `extractSensor()` toleran shape nested & flat |
+| `hub.go` | `currentDevice atomic.Pointer[Client]` — viewer goroutine baca device target tanpa race map; close `sendBinary` saat unregister |
+| `handler.go` | Inject `*voice.Service` + buat channel `sendBinary` |
+| `router.go` | Tambah alias **`/ws/viewer`** (frontend connect ke sini) + pass `voiceSvc` |
+| `cmd/api/main.go` | Construct `voice.NewService(cfg.GroqAPIKey, cfg.GeminiAPIKey)` |
+| `pkg/config/config.go` | Tambah `GroqAPIKey`, `GeminiAPIKey` |
+
+**Status events ke viewer (hanya ke koneksi pemicu, BUKAN broadcast):** mencegah `setData()` di `useTelemetry` ter-korup oleh pesan voice. Dikirim via `c.sendJSON` ke client inisiator saja.
+
+`{"event":"voice_state","state":"recording|processing|playing|idle|error","transcript":"…","reply":"…"}`
+
+---
+
+### 15.5 Frontend Layer (Next.js)
+
+| File | Jenis | Isi |
+|---|---|---|
+| `hooks/useVoiceAssistant.ts` | NEW | WS khusus ke `/viewer`; kirim `start_audio`/`stop_audio`; terima `voice_state`; split newline-coalesced frames |
+| `components/features/AIVoiceButton.tsx` | NEW | Floating PTT button, 4 state visual + caption transcript/reply |
+| `app/dashboard/page.tsx` | MODIFY | Mount `<AIVoiceButton />` |
+
+**4 Visual State:**
+| State | Visual | Trigger |
+|---|---|---|
+| Idle | Teal, ikon Mic, "Hold to talk" | default |
+| Recording | Merah pulsating + halo | `onMouseDown`/`onTouchStart` |
+| Processing | Spinner (Loader2) | server: STT+LLM+TTS jalan |
+| Playing | Equalizer bars animasi | server: streaming TTS ke ESP32 |
+
+Press = `onMouseDown`/`onTouchStart` → `start_audio`. Release = `onMouseUp`/`onTouchEnd`/`onMouseLeave` → `stop_audio`. Disabled saat device offline atau processing/playing.
+
+---
+
+### 15.6 Environment Variables
+
+```bash
+# backend/.env
+GROQ_API_KEY=gsk_...        # https://console.groq.com/keys
+GEMINI_API_KEY=AIza...      # https://aistudio.google.com/apikey (AI Studio key)
+```
+Tanpa keduanya → voice assistant **DISABLED** otomatis (`Service.Enabled()` false), fitur lain tetap jalan.
+
+---
+
+### 15.7 Verifikasi
+
+| Layer | Check | Status |
+|---|---|---|
+| Backend | `go build ./...` | ✅ Pass |
+| Backend | `go vet ./internal/...` | ✅ Pass |
+| Frontend | `npx tsc --noEmit` | ✅ Pass |
+| IoT | Compile via PlatformIO | ⬜ **Perlu di-build user** (env PlatformIO tidak tersedia di sesi ini) |
+
+---
+
+### 15.8 Known Issues & Next Steps
+
+| # | Issue | Prioritas | Catatan |
+|---|---|---|---|
+| V-01 | `GEMINI_API_KEY` di `.env` berformat `AQ.Ab8...` (bukan `AIza...`) | **HIGH** | Jika TTS/reason balas **401/403**, ganti dengan AI Studio key standar `AIza...` dari https://aistudio.google.com/apikey |
+| V-02 | `gemini-2.5-flash-preview-tts` adalah **preview** | MEDIUM | Bisa berubah/ada kuota. Jika 404, cek model tersedia di region akun |
+| V-03 | INMP441 baca 16-bit langsung | MEDIUM | Jika suara pelan/noisy, baca 32-bit slot lalu shift ke 16-bit (INMP441 native 24-bit) |
+| V-04 | True single-call native audio belum dipakai | LOW | Upgrade ke **Gemini Live API** (WebSocket) untuk reasoning+audio satu shot + barge-in |
+| V-05 | Telemetry firmware masih flat `{"temp",...}` vs domain nested `{"sensor":{...}}` | MEDIUM | `extractSensor()` sudah toleran utk konteks AI, tapi path simpan-DB sebaiknya diselaraskan |
+| V-06 | Belum ada echo-cancellation | LOW | Speaker bisa ter-pickup mic jika berdekatan; pisahkan fisik atau half-duplex (sudah half-duplex via mode switch) |
