@@ -28,6 +28,7 @@ export function AIChatPanel({
   const messagesEndRef      = useRef<HTMLDivElement>(null)
   const mediaRecorderRef    = useRef<MediaRecorder | null>(null)
   const audioChunksRef      = useRef<Blob[]>([])
+  const lastSpokenIdRef     = useRef<string | null>(null)
   const [isRecording, setIsRecording]       = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [micError, setMicError]             = useState<string | null>(null)
@@ -36,6 +37,28 @@ export function AIChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Auto-bacakan setiap pesan AI yang selesai streaming via Web Speech API.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
+    const lastAI = [...messages].reverse().find(m => m.role === 'assistant' && !m.isError)
+    if (!lastAI || lastAI.isStreaming || !lastAI.content.trim()) return
+    if (lastAI.id === lastSpokenIdRef.current) return
+
+    lastSpokenIdRef.current = lastAI.id
+    window.speechSynthesis.cancel()
+
+    const utter = new SpeechSynthesisUtterance(lastAI.content)
+    utter.lang  = 'id-ID'
+    utter.rate  = 1.05
+    utter.pitch = 1.0
+    window.speechSynthesis.speak(utter)
+  }, [messages])
+
+  // Hentikan speech saat panel ditutup.
+  useEffect(() => {
+    if (!isOpen && typeof window !== 'undefined') window.speechSynthesis?.cancel()
+  }, [isOpen])
 
   const handleSend = () => {
     if (!inputValue.trim() || isLoading) return
