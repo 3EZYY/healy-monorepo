@@ -102,6 +102,28 @@ export function useVoiceAssistant() {
     return true
   }, [])
 
+  // ── Speak arbitrary text on the device (Generate Insight → TTS) ──
+  const speak = useCallback((text: string) => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false
+    const trimmed = text.trim()
+    if (!trimmed) return false
+    ws.send(JSON.stringify({ event: 'speak_text', text: trimmed }))
+    setVoiceState('processing') // optimistic; server drives playing → idle
+    return true
+  }, [])
+
+  // Allow decoupled components (e.g. AIInsightCard) to trigger TTS via a window
+  // event, reusing this single WS connection instead of opening another.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { text?: string } | undefined
+      if (detail?.text) speak(detail.text)
+    }
+    window.addEventListener('healy-speak', handler)
+    return () => window.removeEventListener('healy-speak', handler)
+  }, [speak])
+
   // ── Press / release (called by AIVoiceButton) ──
   const startRecording = useCallback(() => {
     // Guard: only start a fresh turn from idle/error.
@@ -129,5 +151,6 @@ export function useVoiceAssistant() {
     errorMsg,
     startRecording,
     stopRecording,
+    speak,
   }
 }

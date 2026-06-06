@@ -57,6 +57,25 @@ func (s *Service) Enabled() bool {
 	return s.groqKey != "" && s.geminiKey != ""
 }
 
+// SpeakEnabled reports whether TTS-only synthesis is available (Gemini key set).
+// STT (Groq) is not required for the "speak this text on the device" flow.
+func (s *Service) SpeakEnabled() bool {
+	return s.geminiKey != ""
+}
+
+// Synthesize converts arbitrary text directly to speech PCM (24 kHz, 16-bit
+// mono), skipping STT and reasoning. Used by the dashboard "Generate Insight →
+// speak aloud on the HEALY device" flow.
+func (s *Service) Synthesize(ctx context.Context, text string) ([]byte, error) {
+	if !s.SpeakEnabled() {
+		return nil, fmt.Errorf("tts disabled: missing GEMINI_API_KEY")
+	}
+	if text == "" {
+		return nil, fmt.Errorf("empty text")
+	}
+	return s.synthesize(ctx, text)
+}
+
 // Process runs the full turn for a captured PCM utterance plus live telemetry.
 func (s *Service) Process(ctx context.Context, pcm []byte, telemetry domain.SensorData) (*Result, error) {
 	if !s.Enabled() {

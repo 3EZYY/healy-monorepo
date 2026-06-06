@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -37,9 +38,12 @@ var (
 	space   = []byte{' '}
 )
 
-// controlEvent is the PTT command/status envelope: {"event":"start_audio"}.
+// controlEvent is the PTT command/status envelope from a viewer.
+//   {"event":"start_audio"} / {"event":"stop_audio"}             — PTT mic
+//   {"event":"speak_text","text":"..."}                          — speak an insight
 type controlEvent struct {
 	Event string `json:"event"`
+	Text  string `json:"text,omitempty"`
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -233,6 +237,18 @@ func (c *Client) handleViewerMessage(msgType int, message []byte) {
 		c.sendJSON(map[string]string{"event": "voice_state", "state": "processing"})
 		// Run STT→LLM→TTS off the read loop; status flows back to this viewer.
 		go c.processVoiceTurn(dev)
+
+	case "speak_text":
+		// Dashboard "Generate Insight → speak on device": synthesize the given
+		// text and stream it to the ESP32 speaker. No mic/STT/reasoning involved.
+		dev := c.hub.CurrentDevice()
+		if dev == nil {
+			c.sendJSON(map[string]string{"event": "voice_state", "state": "error", "message": "device offline"})
+			c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
+			return
+		}
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "processing"})
+		go c.processSpeakText(dev, ev.Text)
 	}
 }
 
@@ -246,6 +262,9 @@ func (c *Client) processVoiceTurn(dev *Client) {
 	}
 
 	pcm := dev.DrainAudio()
+	// Diagnostic: how much mic audio actually reached the backend. If this is 0
+	// or tiny (<~16 KB ≈ 0.5s @16kHz), the ESP32 mic path is the problem, not STT.
+	log.Printf("[PTT] captured %d bytes of mic PCM from device %s", len(pcm), dev.DeviceID)
 	if len(pcm) == 0 {
 		c.sendJSON(map[string]string{"event": "voice_state", "state": "error", "message": "no audio captured"})
 		c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
@@ -257,11 +276,12 @@ func (c *Client) processVoiceTurn(dev *Client) {
 
 	res, err := c.Voice.Process(ctx, pcm, dev.GetSensor())
 	if err != nil {
-		log.Printf("voice pipeline error: %v", err)
+		log.Printf("[PTT] voice pipeline error: %v", err)
 		c.sendJSON(map[string]string{"event": "voice_state", "state": "error", "message": err.Error()})
 		c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
 		return
 	}
+	log.Printf("[PTT] transcript=%q reply=%q ttsBytes=%d", res.Transcript, res.ReplyText, len(res.ReplyPCM))
 
 	// Tell the viewer we're about to play, with transcript + reply for the UI.
 	c.sendJSON(map[string]string{
@@ -273,6 +293,47 @@ func (c *Client) processVoiceTurn(dev *Client) {
 
 	// Stream the 24 kHz PCM to the ESP32 speaker in fixed chunks.
 	streamPCMToDevice(dev, res.ReplyPCM)
+
+	c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
+}
+
+// processSpeakText synthesizes the given text (e.g. an AI health insight) and
+// streams it to the device speaker. No mic, STT, or reasoning — just TTS.
+// `c` is the initiating viewer (receives status); `dev` is the ESP32.
+func (c *Client) processSpeakText(dev *Client, text string) {
+	if c.Voice == nil || !c.Voice.SpeakEnabled() {
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "error", "message": "TTS not configured (GEMINI_API_KEY)"})
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
+		return
+	}
+
+	text = strings.TrimSpace(text)
+	if text == "" {
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "error", "message": "empty text"})
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	pcm, err := c.Voice.Synthesize(ctx, text)
+	if err != nil {
+		log.Printf("[SPEAK] tts error: %v", err)
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "error", "message": err.Error()})
+		c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
+		return
+	}
+	log.Printf("[SPEAK] synthesized %d bytes for device %s", len(pcm), dev.DeviceID)
+
+	// Show the spoken text in the viewer caption while it plays.
+	c.sendJSON(map[string]string{
+		"event": "voice_state",
+		"state": "playing",
+		"reply": text,
+	})
+
+	streamPCMToDevice(dev, pcm)
 
 	c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
 }

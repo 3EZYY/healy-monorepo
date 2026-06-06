@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Sparkle, Bot, AlertTriangle } from 'lucide-react'
+import { Sparkle, Bot, AlertTriangle, Volume2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   getStoredGroqKey,
@@ -12,6 +12,12 @@ import {
 
 interface AIInsightCardProps {
   currentData: GroqInsightRequest | null
+}
+
+// Ask the HEALY device to speak the given text aloud (handled by useVoiceAssistant).
+function speakOnDevice(text: string) {
+  if (typeof window === 'undefined' || !text.trim()) return
+  window.dispatchEvent(new CustomEvent('healy-speak', { detail: { text } }))
 }
 
 export function AIInsightCard({ currentData }: AIInsightCardProps) {
@@ -38,9 +44,11 @@ export function AIInsightCard({ currentData }: AIInsightCardProps) {
 
     try {
       const prompt = buildInsightPrompt(currentData)
-      await callGroqInsight(prompt, apiKey, (streamedText) => {
+      const fullText = await callGroqInsight(prompt, apiKey, (streamedText) => {
         setInsight(streamedText) // Update text as it streams
       })
+      // Setelah ringkasan selesai, langsung bacakan di speaker perangkat HEALY.
+      if (fullText?.trim()) speakOnDevice(fullText)
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Gagal menghubungi Groq AI. Periksa koneksi dan API key.'
       setError(message)
@@ -63,16 +71,33 @@ export function AIInsightCard({ currentData }: AIInsightCardProps) {
           </span>
         </div>
 
-        <button
-          onClick={handleGenerateInsight}
-          disabled={loading}
-          className="flex items-center gap-1.5 bg-healy-ai-accent text-white text-xs font-medium
-                     px-3 py-1.5 rounded-lg hover:bg-teal-700 disabled:opacity-50
-                     disabled:cursor-not-allowed transition-all duration-200"
-        >
-          <Sparkle size={14} />
-          {loading ? 'Menganalisis...' : 'Generate Insight'}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bacakan ulang ringkasan di speaker HEALY */}
+          {insight && !loading && (
+            <button
+              onClick={() => speakOnDevice(insight)}
+              title="Bacakan ulang di perangkat HEALY"
+              aria-label="Bacakan ulang ringkasan di perangkat HEALY"
+              className="flex items-center gap-1 text-healy-ai-accent text-xs font-medium
+                         px-2.5 py-1.5 rounded-lg border border-healy-ai-accent/30
+                         hover:bg-healy-ai-accent/10 transition-all duration-200"
+            >
+              <Volume2 size={14} />
+              Bacakan
+            </button>
+          )}
+
+          <button
+            onClick={handleGenerateInsight}
+            disabled={loading}
+            className="flex items-center gap-1.5 bg-healy-ai-accent text-white text-xs font-medium
+                       px-3 py-1.5 rounded-lg hover:bg-teal-700 disabled:opacity-50
+                       disabled:cursor-not-allowed transition-all duration-200"
+          >
+            <Sparkle size={14} />
+            {loading ? 'Menganalisis...' : 'Generate Insight'}
+          </button>
+        </div>
       </div>
 
       {/* Konten */}
