@@ -7,11 +7,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rafif/healy-backend/internal/domain"
 )
+
+var retryAfterRe = regexp.MustCompile(`retry.*?(\d+)s`)
 
 const geminiBase = "https://generativelanguage.googleapis.com/v1beta/models/"
 
@@ -51,40 +57,61 @@ type geminiResponse struct {
 }
 
 // post sends a generateContent request to the given model and returns parsed JSON.
+// Retries once on 429, waiting the duration suggested in the error body.
 func (s *Service) post(ctx context.Context, model string, payload any) (*geminiResponse, error) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
 	url := geminiBase + model + ":generateContent"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	// Header auth works for both AI Studio (AIza…) and express keys; avoids
-	// leaking the key into URLs/logs.
-	req.Header.Set("x-goog-api-key", s.geminiKey)
 
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("gemini request: %w", err)
-	}
-	defer resp.Body.Close()
+	for attempt := 0; attempt < 2; attempt++ {
+		body, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		// Header auth avoids leaking the key into URLs/logs.
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-goog-api-key", s.geminiKey)
 
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini %s status %d: %s", model, resp.StatusCode, string(raw))
-	}
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("gemini request: %w", err)
+		}
+		raw, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
 
-	var parsed geminiResponse
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return nil, fmt.Errorf("decode gemini response: %w (body=%s)", err, string(raw))
+		if resp.StatusCode == 429 && attempt == 0 {
+			// Extract retryDelay seconds from the error body.
+			wait := 20 * time.Second
+			if m := retryAfterRe.FindSubmatch(raw); len(m) > 1 {
+				if secs, e := strconv.Atoi(string(m[1])); e == nil && secs > 0 {
+					wait = time.Duration(secs+2) * time.Second
+				}
+			}
+			log.Printf("[GEMINI] 429 quota — waiting %s before retry", wait)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(wait):
+			}
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("gemini %s status %d: %s", model, resp.StatusCode, string(raw))
+		}
+
+		var parsed geminiResponse
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return nil, fmt.Errorf("decode gemini response: %w (body=%s)", err, string(raw))
+		}
+		if parsed.Error != nil {
+			return nil, fmt.Errorf("gemini error %d: %s", parsed.Error.Code, parsed.Error.Message)
+		}
+		return &parsed, nil
 	}
-	if parsed.Error != nil {
-		return nil, fmt.Errorf("gemini error %d: %s", parsed.Error.Code, parsed.Error.Message)
-	}
-	return &parsed, nil
+	return nil, fmt.Errorf("gemini %s: quota exceeded (retries exhausted)", model)
 }
 
 // reason combines the user's transcript with live telemetry and returns a
