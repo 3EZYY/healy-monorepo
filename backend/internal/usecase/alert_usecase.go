@@ -62,10 +62,10 @@ func EvaluateOverall(tempStatus, spo2Status, bpmStatus domain.SensorStatus) doma
 // EvaluatePayloadWithSettings evaluates a payload using persisted device thresholds.
 // This is the primary evaluation path used by the telemetry usecase.
 func EvaluatePayloadWithSettings(payload domain.TelemetryPayload, settings domain.DeviceSettings) domain.TelemetryRecord {
-	// Temp: uses settings.TempWarnMax (NORMAL→WARNING boundary) and settings.TempCritMax (WARNING→CRITICAL)
+	// Temp: full range from DB — below TempNormalMin → CRITICAL, above TempCritMax → CRITICAL
 	var tempStatus domain.SensorStatus
 	switch {
-	case payload.Sensor.Temperature >= TempNormalMin && payload.Sensor.Temperature <= settings.TempWarnMax:
+	case payload.Sensor.Temperature >= settings.TempNormalMin && payload.Sensor.Temperature <= settings.TempWarnMax:
 		tempStatus = domain.StatusNormal
 	case payload.Sensor.Temperature > settings.TempWarnMax && payload.Sensor.Temperature <= settings.TempCritMax:
 		tempStatus = domain.StatusWarning
@@ -101,11 +101,12 @@ func EvaluatePayloadWithSettings(payload domain.TelemetryPayload, settings domai
 // Kept for backward compatibility with unit tests.
 func EvaluatePayload(payload domain.TelemetryPayload) domain.TelemetryRecord {
 	return EvaluatePayloadWithSettings(payload, domain.DeviceSettings{
-		TempWarnMax:  TempNormalMax,
-		TempCritMax:  TempWarnMax,
-		SpO2WarnMin:  SpO2NormalMin,
-		SpO2CritMin:  SpO2WarnMin,
-		BpmNormalMin: BpmNormalMin,
-		BpmNormalMax: BpmNormalMax,
+		TempNormalMin: TempNormalMin,
+		TempWarnMax:   TempNormalMax,
+		TempCritMax:   TempWarnMax,
+		SpO2WarnMin:   SpO2NormalMin,
+		SpO2CritMin:   SpO2WarnMin,
+		BpmNormalMin:  BpmNormalMin,
+		BpmNormalMax:  BpmNormalMax,
 	})
 }

@@ -25,8 +25,8 @@ func NewSettingsRepository(pool *pgxpool.Pool) interfaces.SettingsRepository {
 // If no row exists, it returns the default settings.
 func (r *settingsRepository) GetByDeviceID(ctx context.Context, deviceID string) (domain.DeviceSettings, error) {
 	const query = `
-		SELECT device_id, temp_warn_max, temp_crit_max, spo2_warn_min, spo2_crit_min,
-		       bpm_normal_min, bpm_normal_max, updated_at
+		SELECT device_id, temp_normal_min, temp_warn_max, temp_crit_max,
+		       spo2_warn_min, spo2_crit_min, bpm_normal_min, bpm_normal_max, updated_at
 		FROM public.device_settings
 		WHERE device_id = $1
 	`
@@ -34,6 +34,7 @@ func (r *settingsRepository) GetByDeviceID(ctx context.Context, deviceID string)
 	var s domain.DeviceSettings
 	err := r.pool.QueryRow(ctx, query, deviceID).Scan(
 		&s.DeviceID,
+		&s.TempNormalMin,
 		&s.TempWarnMax,
 		&s.TempCritMax,
 		&s.SpO2WarnMin,
@@ -57,25 +58,27 @@ func (r *settingsRepository) GetByDeviceID(ctx context.Context, deviceID string)
 func (r *settingsRepository) Upsert(ctx context.Context, settings domain.DeviceSettings) (domain.DeviceSettings, error) {
 	const query = `
 		INSERT INTO public.device_settings
-			(device_id, temp_warn_max, temp_crit_max, spo2_warn_min, spo2_crit_min,
-			 bpm_normal_min, bpm_normal_max, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+			(device_id, temp_normal_min, temp_warn_max, temp_crit_max,
+			 spo2_warn_min, spo2_crit_min, bpm_normal_min, bpm_normal_max, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
 		ON CONFLICT (device_id)
 		DO UPDATE SET
-			temp_warn_max  = EXCLUDED.temp_warn_max,
-			temp_crit_max  = EXCLUDED.temp_crit_max,
-			spo2_warn_min  = EXCLUDED.spo2_warn_min,
-			spo2_crit_min  = EXCLUDED.spo2_crit_min,
-			bpm_normal_min = EXCLUDED.bpm_normal_min,
-			bpm_normal_max = EXCLUDED.bpm_normal_max,
-			updated_at     = NOW()
-		RETURNING device_id, temp_warn_max, temp_crit_max, spo2_warn_min, spo2_crit_min,
-		          bpm_normal_min, bpm_normal_max, updated_at
+			temp_normal_min = EXCLUDED.temp_normal_min,
+			temp_warn_max   = EXCLUDED.temp_warn_max,
+			temp_crit_max   = EXCLUDED.temp_crit_max,
+			spo2_warn_min   = EXCLUDED.spo2_warn_min,
+			spo2_crit_min   = EXCLUDED.spo2_crit_min,
+			bpm_normal_min  = EXCLUDED.bpm_normal_min,
+			bpm_normal_max  = EXCLUDED.bpm_normal_max,
+			updated_at      = NOW()
+		RETURNING device_id, temp_normal_min, temp_warn_max, temp_crit_max,
+		          spo2_warn_min, spo2_crit_min, bpm_normal_min, bpm_normal_max, updated_at
 	`
 
 	var s domain.DeviceSettings
 	err := r.pool.QueryRow(ctx, query,
 		settings.DeviceID,
+		settings.TempNormalMin,
 		settings.TempWarnMax,
 		settings.TempCritMax,
 		settings.SpO2WarnMin,
@@ -84,6 +87,7 @@ func (r *settingsRepository) Upsert(ctx context.Context, settings domain.DeviceS
 		settings.BpmNormalMax,
 	).Scan(
 		&s.DeviceID,
+		&s.TempNormalMin,
 		&s.TempWarnMax,
 		&s.TempCritMax,
 		&s.SpO2WarnMin,

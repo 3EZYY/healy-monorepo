@@ -19,6 +19,18 @@ import (
 //	spo2_warn_min       ←  spo2_crit_min  (lower bound of WARNING)
 //	bpm_normal_min      ←  bpm_normal_min (stored directly)
 //	bpm_normal_max      ←  bpm_normal_max (stored directly)
+// ThresholdSettingsDTO is the JSON shape the frontend expects.
+// All 7 fields are now persisted in DB — no hardcoded constants.
+//
+//	Frontend Field      ←→  DB Column
+//	─────────────────────────────────────────
+//	temp_normal_min     ←→  temp_normal_min
+//	temp_normal_max     ←→  temp_warn_max   (upper bound of NORMAL)
+//	temp_warn_max       ←→  temp_crit_max   (upper bound of WARNING)
+//	spo2_normal_min     ←→  spo2_warn_min   (lower bound of NORMAL)
+//	spo2_warn_min       ←→  spo2_crit_min   (lower bound of WARNING)
+//	bpm_normal_min      ←→  bpm_normal_min
+//	bpm_normal_max      ←→  bpm_normal_max
 type ThresholdSettingsDTO struct {
 	TempNormalMin float64 `json:"temp_normal_min"`
 	TempNormalMax float64 `json:"temp_normal_max"`
@@ -29,11 +41,9 @@ type ThresholdSettingsDTO struct {
 	BpmNormalMax  int     `json:"bpm_normal_max"`
 }
 
-const tempNormalMinConst = 36.1
-
 func toDTO(s domain.DeviceSettings) ThresholdSettingsDTO {
 	return ThresholdSettingsDTO{
-		TempNormalMin: tempNormalMinConst,
+		TempNormalMin: s.TempNormalMin,
 		TempNormalMax: s.TempWarnMax,
 		TempWarnMax:   s.TempCritMax,
 		SpO2NormalMin: s.SpO2WarnMin,
@@ -45,13 +55,14 @@ func toDTO(s domain.DeviceSettings) ThresholdSettingsDTO {
 
 func fromDTO(dto ThresholdSettingsDTO, deviceID string) domain.DeviceSettings {
 	return domain.DeviceSettings{
-		DeviceID:     deviceID,
-		TempWarnMax:  dto.TempNormalMax,
-		TempCritMax:  dto.TempWarnMax,
-		SpO2WarnMin:  dto.SpO2NormalMin,
-		SpO2CritMin:  dto.SpO2WarnMin,
-		BpmNormalMin: dto.BpmNormalMin,
-		BpmNormalMax: dto.BpmNormalMax,
+		DeviceID:      deviceID,
+		TempNormalMin: dto.TempNormalMin,
+		TempWarnMax:   dto.TempNormalMax,
+		TempCritMax:   dto.TempWarnMax,
+		SpO2WarnMin:   dto.SpO2NormalMin,
+		SpO2CritMin:   dto.SpO2WarnMin,
+		BpmNormalMin:  dto.BpmNormalMin,
+		BpmNormalMax:  dto.BpmNormalMax,
 	}
 }
 
