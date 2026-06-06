@@ -291,8 +291,8 @@ export default function DashboardPage() {
         context={chatContext}
       />
 
-      {/* ─── PTT Voice Assistant (F-05) — floating action button ─── */}
-      <AIVoiceButton />
+      {/* ─── PTT Voice Assistant (F-05) — hidden while AI chat is open ─── */}
+      {!isOpen && <AIVoiceButton />}
     </motion.div>
   )
 }
