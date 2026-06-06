@@ -2,17 +2,21 @@ package usecase
 
 import "github.com/rafif/healy-backend/internal/domain"
 
-// Threshold defaults — overrideable via device_settings table
+// Hardcoded defaults — used only when no DeviceSettings row exists in DB
+// and as fallback for the legacy EvaluatePayload function used in tests.
 const (
 	TempNormalMin float64 = 36.5
 	TempNormalMax float64 = 37.5
-	TempWarnMax   float64 = 38.5 // Above this = CRITICAL
+	TempWarnMax   float64 = 38.5
 
 	SpO2NormalMin int = 95
-	SpO2WarnMin   int = 91 // Below this = CRITICAL
+	SpO2WarnMin   int = 91
+
+	BpmNormalMin int = 60
+	BpmNormalMax int = 100
 )
 
-// EvaluateTemperature mengembalikan status berdasarkan rentang suhu.
+// EvaluateTemperature returns status based on temperature (°C).
 func EvaluateTemperature(temp float64) domain.SensorStatus {
 	switch {
 	case temp >= TempNormalMin && temp <= TempNormalMax:
@@ -24,7 +28,7 @@ func EvaluateTemperature(temp float64) domain.SensorStatus {
 	}
 }
 
-// EvaluateSpO2 mengembalikan status berdasarkan kadar oksigen dalam darah.
+// EvaluateSpO2 returns status based on blood oxygen saturation (%).
 func EvaluateSpO2(spo2 int) domain.SensorStatus {
 	switch {
 	case spo2 >= SpO2NormalMin:
@@ -36,29 +40,72 @@ func EvaluateSpO2(spo2 int) domain.SensorStatus {
 	}
 }
 
-// EvaluateOverall menentukan status keseluruhan dari status individual sensor.
-func EvaluateOverall(tempStatus, spo2Status domain.SensorStatus) domain.SensorStatus {
+// EvaluateBPM returns status based on heart rate against configurable thresholds.
+func EvaluateBPM(bpm, normalMin, normalMax int) domain.SensorStatus {
+	if bpm >= normalMin && bpm <= normalMax {
+		return domain.StatusNormal
+	}
+	return domain.StatusWarning
+}
+
+// EvaluateOverall returns the worst-case status across all three sensors.
+func EvaluateOverall(tempStatus, spo2Status, bpmStatus domain.SensorStatus) domain.SensorStatus {
 	if tempStatus == domain.StatusCritical || spo2Status == domain.StatusCritical {
 		return domain.StatusCritical
 	}
-	if tempStatus == domain.StatusWarning || spo2Status == domain.StatusWarning {
+	if tempStatus == domain.StatusWarning || spo2Status == domain.StatusWarning || bpmStatus == domain.StatusWarning {
 		return domain.StatusWarning
 	}
 	return domain.StatusNormal
 }
 
-// EvaluatePayload adalah entry point utama — menerima raw payload dari ESP32
-// dan mengembalikan TelemetryRecord yang siap disimpan ke DB
-func EvaluatePayload(payload domain.TelemetryPayload) domain.TelemetryRecord {
-	tempStatus := EvaluateTemperature(payload.Sensor.Temperature)
-	spo2Status := EvaluateSpO2(payload.Sensor.SpO2)
+// EvaluatePayloadWithSettings evaluates a payload using persisted device thresholds.
+// This is the primary evaluation path used by the telemetry usecase.
+func EvaluatePayloadWithSettings(payload domain.TelemetryPayload, settings domain.DeviceSettings) domain.TelemetryRecord {
+	// Temp: uses settings.TempWarnMax (NORMAL→WARNING boundary) and settings.TempCritMax (WARNING→CRITICAL)
+	var tempStatus domain.SensorStatus
+	switch {
+	case payload.Sensor.Temperature >= TempNormalMin && payload.Sensor.Temperature <= settings.TempWarnMax:
+		tempStatus = domain.StatusNormal
+	case payload.Sensor.Temperature > settings.TempWarnMax && payload.Sensor.Temperature <= settings.TempCritMax:
+		tempStatus = domain.StatusWarning
+	default:
+		tempStatus = domain.StatusCritical
+	}
+
+	// SpO2: uses settings.SpO2WarnMin (NORMAL→WARNING) and settings.SpO2CritMin (WARNING→CRITICAL)
+	var spo2Status domain.SensorStatus
+	switch {
+	case payload.Sensor.SpO2 >= settings.SpO2WarnMin:
+		spo2Status = domain.StatusNormal
+	case payload.Sensor.SpO2 >= settings.SpO2CritMin:
+		spo2Status = domain.StatusWarning
+	default:
+		spo2Status = domain.StatusCritical
+	}
+
+	bpmStatus := EvaluateBPM(payload.Sensor.BPM, settings.BpmNormalMin, settings.BpmNormalMax)
 
 	return domain.TelemetryRecord{
 		TelemetryPayload: payload,
 		Status: domain.EvaluatedStatus{
 			Temperature: tempStatus,
 			SpO2:        spo2Status,
-			Overall:     EvaluateOverall(tempStatus, spo2Status),
+			BPM:         bpmStatus,
+			Overall:     EvaluateOverall(tempStatus, spo2Status, bpmStatus),
 		},
 	}
+}
+
+// EvaluatePayload evaluates using hardcoded defaults.
+// Kept for backward compatibility with unit tests.
+func EvaluatePayload(payload domain.TelemetryPayload) domain.TelemetryRecord {
+	return EvaluatePayloadWithSettings(payload, domain.DeviceSettings{
+		TempWarnMax:  TempNormalMax,
+		TempCritMax:  TempWarnMax,
+		SpO2WarnMin:  SpO2NormalMin,
+		SpO2CritMin:  SpO2WarnMin,
+		BpmNormalMin: BpmNormalMin,
+		BpmNormalMax: BpmNormalMax,
+	})
 }

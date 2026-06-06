@@ -205,8 +205,8 @@ export async function fetchThresholds(): Promise<ThresholdSettings> {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`Threshold fetch failed: ${res.status}`)
-  const data = await res.json()
-  return { ...data, ...loadBpmThresholds() }
+  // Backend is now source of truth for BPM thresholds — return directly
+  return res.json()
 }
 
 /**
@@ -214,22 +214,20 @@ export async function fetchThresholds(): Promise<ThresholdSettings> {
  * Updates threshold configuration.
  */
 export async function updateThresholds(settings: ThresholdSettings): Promise<ThresholdSettings> {
-  // BPM fields are frontend-only — persist locally before calling the API.
-  saveBpmThresholds(settings.bpm_normal_min, settings.bpm_normal_max)
-
   if (USE_MOCK) {
+    saveBpmThresholds(settings.bpm_normal_min, settings.bpm_normal_max)
     await new Promise(r => setTimeout(r, 500))
-    return settings // Echo back
+    return settings
   }
 
   const res = await fetch(`${API_URL}/settings/threshold`, {
     method: 'PUT',
     headers: authHeaders(),
-    body: JSON.stringify(settings), // backend ignores unknown bpm_* fields
+    body: JSON.stringify(settings),
   })
   if (!res.ok) throw new Error(`Threshold update failed: ${res.status}`)
-  const data = await res.json()
-  return { ...data, bpm_normal_min: settings.bpm_normal_min, bpm_normal_max: settings.bpm_normal_max }
+  // Backend now persists and returns BPM fields — use response directly
+  return res.json()
 }
 
 /**

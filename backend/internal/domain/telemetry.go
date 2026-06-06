@@ -38,5 +38,6 @@ type TelemetryRecord struct {
 type EvaluatedStatus struct {
 	Temperature SensorStatus `json:"temperature"`
 	SpO2        SensorStatus `json:"spo2"`
+	BPM         SensorStatus `json:"bpm"`
 	Overall     SensorStatus `json:"overall"`
 }

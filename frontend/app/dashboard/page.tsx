@@ -191,7 +191,7 @@ export default function DashboardPage() {
           title="Heart Rate"
           value={data.sensor.bpm}
           unit="BPM"
-          status={data.status.overall === 'CRITICAL' ? 'CRITICAL' : data.status.overall === 'WARNING' ? 'WARNING' : 'NORMAL'}
+          status={data.status.bpm ?? data.status.overall}
           icon="bpm"
         />
         <SensorCard

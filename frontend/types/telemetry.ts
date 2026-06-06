@@ -11,6 +11,7 @@ export interface SensorData {
 export interface EvaluatedStatus {
   temperature: SensorStatus
   spo2: SensorStatus
+  bpm?: SensorStatus  // evaluated by backend against bpm_normal_min/max thresholds
   overall: SensorStatus
 }
 

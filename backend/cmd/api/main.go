@@ -53,7 +53,7 @@ func main() {
 
 	// 7. Initialize Usecases
 	// Inject the hub's broadcast channel into the telemetry usecase
-	telemetryUsecase := usecase.NewTelemetryUsecase(telemetryRepo, hub.Broadcast)
+	telemetryUsecase := usecase.NewTelemetryUsecase(telemetryRepo, settingsRepo, hub.Broadcast)
 	authUsecase := usecase.NewAuthUsecase(userRepo, tokenGenerator)
 
 	// 7b. Initialize AI Voice Assistant pipeline (Groq STT + Gemini reason/TTS)

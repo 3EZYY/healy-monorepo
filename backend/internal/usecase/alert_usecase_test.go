@@ -14,7 +14,7 @@ func TestEvaluateTemperature(t *testing.T) {
 		temp     float64
 		expected domain.SensorStatus
 	}{
-		{"Below Normal (Critical)", 36.4, domain.StatusCritical}, // Assuming below min is critical as default case
+		{"Below Normal (Critical)", 36.4, domain.StatusCritical},
 		{"Normal Lower Bound", 36.5, domain.StatusNormal},
 		{"Normal Inside", 37.0, domain.StatusNormal},
 		{"Normal Upper Bound", 37.5, domain.StatusNormal},
@@ -58,28 +58,58 @@ func TestEvaluateSpO2(t *testing.T) {
 	}
 }
 
+func TestEvaluateBPM(t *testing.T) {
+	tests := []struct {
+		name     string
+		bpm      int
+		min      int
+		max      int
+		expected domain.SensorStatus
+	}{
+		{"Normal Lower Bound", 60, 60, 100, domain.StatusNormal},
+		{"Normal Inside", 75, 60, 100, domain.StatusNormal},
+		{"Normal Upper Bound", 100, 60, 100, domain.StatusNormal},
+		{"Warning Low (bradycardia)", 59, 60, 100, domain.StatusWarning},
+		{"Warning High (tachycardia)", 101, 60, 100, domain.StatusWarning},
+		{"Custom range Normal", 80, 70, 120, domain.StatusNormal},
+		{"Custom range Warning", 65, 70, 120, domain.StatusWarning},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := usecase.EvaluateBPM(tt.bpm, tt.min, tt.max)
+			if result != tt.expected {
+				t.Errorf("EvaluateBPM(%d, %d, %d) = %v; want %v", tt.bpm, tt.min, tt.max, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestEvaluateOverall(t *testing.T) {
 	tests := []struct {
 		name       string
 		tempStatus domain.SensorStatus
 		spo2Status domain.SensorStatus
+		bpmStatus  domain.SensorStatus
 		expected   domain.SensorStatus
 	}{
-		{"Both Normal", domain.StatusNormal, domain.StatusNormal, domain.StatusNormal},
-		{"Temp Warning", domain.StatusWarning, domain.StatusNormal, domain.StatusWarning},
-		{"SpO2 Warning", domain.StatusNormal, domain.StatusWarning, domain.StatusWarning},
-		{"Both Warning", domain.StatusWarning, domain.StatusWarning, domain.StatusWarning},
-		{"Temp Critical", domain.StatusCritical, domain.StatusNormal, domain.StatusCritical},
-		{"SpO2 Critical", domain.StatusNormal, domain.StatusCritical, domain.StatusCritical},
-		{"Critical and Warning", domain.StatusCritical, domain.StatusWarning, domain.StatusCritical},
-		{"Both Critical", domain.StatusCritical, domain.StatusCritical, domain.StatusCritical},
+		{"All Normal", domain.StatusNormal, domain.StatusNormal, domain.StatusNormal, domain.StatusNormal},
+		{"Temp Warning", domain.StatusWarning, domain.StatusNormal, domain.StatusNormal, domain.StatusWarning},
+		{"SpO2 Warning", domain.StatusNormal, domain.StatusWarning, domain.StatusNormal, domain.StatusWarning},
+		{"BPM Warning", domain.StatusNormal, domain.StatusNormal, domain.StatusWarning, domain.StatusWarning},
+		{"Both Warning", domain.StatusWarning, domain.StatusWarning, domain.StatusNormal, domain.StatusWarning},
+		{"Temp Critical", domain.StatusCritical, domain.StatusNormal, domain.StatusNormal, domain.StatusCritical},
+		{"SpO2 Critical", domain.StatusNormal, domain.StatusCritical, domain.StatusNormal, domain.StatusCritical},
+		{"Critical and Warning", domain.StatusCritical, domain.StatusWarning, domain.StatusWarning, domain.StatusCritical},
+		{"All Critical", domain.StatusCritical, domain.StatusCritical, domain.StatusWarning, domain.StatusCritical},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := usecase.EvaluateOverall(tt.tempStatus, tt.spo2Status)
+			result := usecase.EvaluateOverall(tt.tempStatus, tt.spo2Status, tt.bpmStatus)
 			if result != tt.expected {
-				t.Errorf("EvaluateOverall(%v, %v) = %v; want %v", tt.tempStatus, tt.spo2Status, result, tt.expected)
+				t.Errorf("EvaluateOverall(%v, %v, %v) = %v; want %v",
+					tt.tempStatus, tt.spo2Status, tt.bpmStatus, result, tt.expected)
 			}
 		})
 	}
@@ -95,7 +125,7 @@ func TestEvaluatePayload(t *testing.T) {
 		{
 			name: "All Normal",
 			payload: domain.TelemetryPayload{
-				DeviceID:  "healy-001",
+				DeviceID:  "healy-esp32",
 				Timestamp: now,
 				Sensor: domain.SensorData{
 					Temperature: 37.0,
@@ -106,23 +136,43 @@ func TestEvaluatePayload(t *testing.T) {
 			expected: domain.EvaluatedStatus{
 				Temperature: domain.StatusNormal,
 				SpO2:        domain.StatusNormal,
+				BPM:         domain.StatusNormal,
 				Overall:     domain.StatusNormal,
 			},
 		},
 		{
-			name: "Mixed Warning and Critical",
+			name: "BPM Tachycardia Warning",
 			payload: domain.TelemetryPayload{
-				DeviceID:  "healy-001",
+				DeviceID:  "healy-esp32",
+				Timestamp: now,
+				Sensor: domain.SensorData{
+					Temperature: 37.0,
+					BPM:         120, // above default max 100 → WARNING
+					SpO2:        98,
+				},
+			},
+			expected: domain.EvaluatedStatus{
+				Temperature: domain.StatusNormal,
+				SpO2:        domain.StatusNormal,
+				BPM:         domain.StatusWarning,
+				Overall:     domain.StatusWarning,
+			},
+		},
+		{
+			name: "Mixed SpO2 Critical",
+			payload: domain.TelemetryPayload{
+				DeviceID:  "healy-esp32",
 				Timestamp: now,
 				Sensor: domain.SensorData{
 					Temperature: 38.0, // Warning
-					BPM:         120,
+					BPM:         120,  // Warning
 					SpO2:        89,   // Critical
 				},
 			},
 			expected: domain.EvaluatedStatus{
 				Temperature: domain.StatusWarning,
 				SpO2:        domain.StatusCritical,
+				BPM:         domain.StatusWarning,
 				Overall:     domain.StatusCritical,
 			},
 		},
@@ -133,7 +183,7 @@ func TestEvaluatePayload(t *testing.T) {
 			result := usecase.EvaluatePayload(tt.payload)
 
 			if result.Status != tt.expected {
-				t.Errorf("EvaluatePayload() Status = %v; want %v", result.Status, tt.expected)
+				t.Errorf("EvaluatePayload() Status = %+v; want %+v", result.Status, tt.expected)
 			}
 			if result.DeviceID != tt.payload.DeviceID {
 				t.Errorf("EvaluatePayload() DeviceID = %s; want %s", result.DeviceID, tt.payload.DeviceID)
