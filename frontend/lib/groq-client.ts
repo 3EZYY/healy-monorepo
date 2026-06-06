@@ -103,6 +103,28 @@ export async function callGroqInsight(
   return json.choices?.[0]?.message?.content || ''
 }
 
+// ─── STT — Groq Whisper (browser mic → transcript) ───
+
+export async function callGroqSTT(audioBlob: Blob, apiKey: string): Promise<string> {
+  const form = new FormData()
+  form.append('file', audioBlob, 'recording.webm')
+  form.append('model', 'whisper-large-v3-turbo')
+  form.append('language', 'id')
+  form.append('response_format', 'json')
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body: form,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error?.message || `STT error: ${res.status}`)
+  }
+  const data = await res.json()
+  return (data.text as string || '').trim()
+}
+
 // ─── CHAT (MULTI-TURN) — digunakan useChatbot ───
 // callGroqChat adalah thin wrapper — logika streaming di-handle oleh useChatbot
 // karena chatbot membutuhkan kendali penuh atas state per-message

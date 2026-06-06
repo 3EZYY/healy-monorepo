@@ -1,12 +1,13 @@
 // src/components/features/AIChatPanel.tsx — NEW v4.0.0
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  X, Bot, Send, Loader2, Trash2, AlertTriangle
+  X, Bot, Send, Loader2, Trash2, AlertTriangle, Mic, MicOff
 } from 'lucide-react'
 import { ChatMessage, ChatContext } from '@/types/chat'
+import { callGroqSTT, getStoredGroqKey } from '@/lib/groq-client'
 
 interface AIChatPanelProps {
   isOpen:       boolean
@@ -24,7 +25,12 @@ export function AIChatPanel({
   isOpen, onClose, messages, isLoading,
   inputValue, onInputChange, onSend, onClear, context
 }: AIChatPanelProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef      = useRef<HTMLDivElement>(null)
+  const mediaRecorderRef    = useRef<MediaRecorder | null>(null)
+  const audioChunksRef      = useRef<Blob[]>([])
+  const [isRecording, setIsRecording]       = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [micError, setMicError]             = useState<string | null>(null)
 
   // Auto-scroll ke pesan terbaru
   useEffect(() => {
@@ -32,7 +38,7 @@ export function AIChatPanel({
   }, [messages])
 
   const handleSend = () => {
-    if (!inputValue.trim() || !context) return
+    if (!inputValue.trim() || isLoading) return
     onSend(inputValue)
   }
 
@@ -41,6 +47,59 @@ export function AIChatPanel({
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+  }
+
+  const startRecording = async () => {
+    setMicError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg'
+      const mr = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        if (blob.size < 1000) return // terlalu pendek, skip
+
+        setIsTranscribing(true)
+        try {
+          const apiKey = getStoredGroqKey()
+          if (!apiKey) throw new Error('Groq API Key belum diisi di sidebar')
+          const text = await callGroqSTT(blob, apiKey)
+          if (text) {
+            onInputChange(text)
+            // Auto-submit setelah transkripsi
+            onSend(text)
+          }
+        } catch (err) {
+          setMicError(err instanceof Error ? err.message : 'Transkripsi gagal')
+        } finally {
+          setIsTranscribing(false)
+        }
+      }
+
+      mr.start()
+      mediaRecorderRef.current = mr
+      setIsRecording(true)
+    } catch (err) {
+      setMicError('Akses mikrofon ditolak atau tidak tersedia')
+      console.error('Mic error:', err)
+    }
+  }
+
+  const handleMicClick = () => {
+    if (isRecording) stopRecording()
+    else startRecording()
   }
 
   return (
@@ -167,31 +226,61 @@ export function AIChatPanel({
 
             {/* Input Area */}
             <div className="px-4 py-3 border-t border-healy-border">
+              {micError && (
+                <p className="text-[10px] text-healy-critical mb-1.5 flex items-center gap-1">
+                  <AlertTriangle size={10} /> {micError}
+                </p>
+              )}
               <div className="flex gap-2">
                 <textarea
                   value={inputValue}
                   onChange={e => onInputChange(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Tanya tentang kondisi pasien..."
+                  placeholder={isTranscribing ? 'Sedang mentranskrip...' : isRecording ? 'Merekam... (klik mic untuk berhenti)' : 'Tanya tentang kondisi pasien...'}
                   rows={2}
+                  disabled={isRecording || isTranscribing}
                   className="flex-1 text-xs font-body resize-none px-3 py-2 rounded-xl
                              border border-healy-border bg-healy-bg
                              text-healy-graphite placeholder:text-healy-slate
                              focus:outline-none focus:ring-2 focus:ring-healy-ai-accent/30
-                             focus:border-healy-ai-accent transition-all"
+                             focus:border-healy-ai-accent transition-all
+                             disabled:opacity-50 disabled:cursor-not-allowed"
                 />
-                <button
-                  onClick={handleSend}
-                  disabled={!inputValue.trim() || isLoading || !context}
-                  className="self-end p-2.5 rounded-xl bg-healy-ai-accent text-white
-                             disabled:opacity-40 disabled:cursor-not-allowed
-                             hover:bg-teal-700 transition-colors"
-                >
-                  <Send size={16} />
-                </button>
+                <div className="flex flex-col gap-1.5 self-end">
+                  {/* Mic Button */}
+                  <button
+                    onClick={handleMicClick}
+                    disabled={isLoading || isTranscribing}
+                    title={isRecording ? 'Stop rekaman' : 'Mulai rekam suara'}
+                    className={`p-2.5 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+                      ${isRecording
+                        ? 'bg-healy-critical text-white animate-pulse'
+                        : isTranscribing
+                          ? 'bg-healy-warning/20 text-healy-warning'
+                          : 'bg-healy-bg-alt text-healy-ai-accent border border-healy-border hover:bg-healy-ai-accent/10'
+                      }`}
+                  >
+                    {isTranscribing
+                      ? <Loader2 size={16} className="animate-spin" />
+                      : isRecording
+                        ? <MicOff size={16} />
+                        : <Mic size={16} />
+                    }
+                  </button>
+                  {/* Send Button */}
+                  <button
+                    onClick={handleSend}
+                    disabled={!inputValue.trim() || isLoading || isRecording || isTranscribing}
+                    className="p-2.5 rounded-xl bg-healy-ai-accent text-white
+                               disabled:opacity-40 disabled:cursor-not-allowed
+                               hover:bg-teal-700 transition-colors"
+                  >
+                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-healy-slate mt-1.5 text-center">
-                Enter untuk kirim · Shift+Enter untuk baris baru
+                Enter untuk kirim · Shift+Enter baris baru · Mic untuk suara
               </p>
             </div>
           </motion.div>

@@ -93,6 +93,17 @@ export default function DashboardPage() {
     return () => window.removeEventListener('open-ai-chat', handleOpen)
   }, [openChat])
 
+  // chatContext is null when no data yet (device offline) — AI still works with generic prompt
+  const chatContext: ChatContext | null = data ? {
+    temperature: data.sensor.temperature,
+    bpm: data.sensor.bpm,
+    spo2: data.sensor.spo2,
+    tempStatus: data.status.temperature,
+    spo2Status: data.status.spo2,
+    overallStatus: data.status.overall,
+    timestamp: new Date(data.timestamp).toLocaleString('id-ID'),
+  } : null
+
   // ─── Fallback while waiting for first payload ───
   if (!data) {
     return (
@@ -107,6 +118,18 @@ export default function DashboardPage() {
           </div>
           <ConnectionStatus conn={conn} />
         </div>
+        {/* Chat still accessible while device is offline */}
+        <AIChatPanel
+          isOpen={isOpen}
+          onClose={closeChat}
+          messages={messages}
+          isLoading={isLoading}
+          inputValue={inputValue}
+          onInputChange={setInputValue}
+          onSend={(input) => sendMessage(input, chatContext)}
+          onClear={clearHistory}
+          context={chatContext}
+        />
       </div>
     )
   }
@@ -116,16 +139,6 @@ export default function DashboardPage() {
     bpm: data.sensor.bpm,
     spo2: data.sensor.spo2,
     status: data.status.overall,
-  }
-
-  const chatContext: ChatContext = {
-    temperature: data.sensor.temperature,
-    bpm: data.sensor.bpm,
-    spo2: data.sensor.spo2,
-    tempStatus: data.status.temperature,
-    spo2Status: data.status.spo2,
-    overallStatus: data.status.overall,
-    timestamp: new Date(data.timestamp).toLocaleString('id-ID'),
   }
 
   return (

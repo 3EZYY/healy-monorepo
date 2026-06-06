@@ -6,7 +6,18 @@ import { getStoredGroqKey, validateGroqKey, callGroqChat } from '@/lib/groq-clie
 
 const MAX_HISTORY = 20  // Batas pesan dalam satu sesi untuk hemat token
 
-function buildSystemPrompt(ctx: ChatContext): string {
+function buildSystemPrompt(ctx: ChatContext | null): string {
+  if (!ctx) {
+    return `Kamu adalah HEALY AI, asisten kesehatan cerdas yang terintegrasi dengan sistem monitoring robot HEALY.
+Saat ini perangkat HEALY sedang offline atau belum mengirim data sensor.
+
+PANDUAN RESPONS:
+- Jawab dalam Bahasa Indonesia yang ramah dan mudah dipahami.
+- Karena tidak ada data real-time, berikan informasi kesehatan umum yang relevan.
+- Sarankan pengguna untuk memastikan perangkat HEALY terhubung untuk mendapat analisis yang lebih akurat.
+- Berikan informasi medis yang akurat namun selalu sarankan konsultasi dokter untuk diagnosis resmi.`
+  }
+
   return `Kamu adalah HEALY AI, asisten kesehatan cerdas yang terintegrasi dengan sistem monitoring robot HEALY.
 
 DATA SENSOR PASIEN SAAT INI (diperbarui secara real-time):
@@ -43,7 +54,7 @@ export function useChatbot() {
 
   const sendMessage = useCallback(async (
     userInput: string,
-    context: ChatContext
+    context: ChatContext | null
   ) => {
     const trimmed = userInput.trim()
     if (!trimmed || isLoading) return
