@@ -281,7 +281,8 @@ func (c *Client) processVoiceTurn(dev *Client) {
 		c.sendJSON(map[string]string{"event": "voice_state", "state": "idle"})
 		return
 	}
-	log.Printf("[PTT] transcript=%q reply=%q ttsBytes=%d", res.Transcript, res.ReplyText, len(res.ReplyPCM))
+	log.Printf("[PTT] transcript=%q ttsBytes=%d", res.Transcript, len(res.ReplyPCM))
+	log.Printf("[PTT] reply → %s", res.ReplyText)
 
 	// Tell the viewer we're about to play, with transcript + reply for the UI.
 	c.sendJSON(map[string]string{

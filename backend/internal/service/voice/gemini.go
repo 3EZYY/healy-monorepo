@@ -90,16 +90,19 @@ func (s *Service) post(ctx context.Context, model string, payload any) (*geminiR
 // reason combines the user's transcript with live telemetry and returns a
 // concise Indonesian reply (Stage 2 of the pipeline).
 func (s *Service) reason(ctx context.Context, transcript string, t domain.SensorData) (string, error) {
-	system := "Kamu adalah HEALY, asisten kesehatan suara berbahasa Indonesia. " +
-		"Jawab SINGKAT (maksimal 2 kalimat), ramah, dan jelas untuk diucapkan. " +
-		"Gunakan data sensor pasien bila relevan. Jangan memberi diagnosis medis pasti; " +
-		"sarankan periksa ke tenaga medis bila ada tanda bahaya."
+	system := "Kamu adalah HEALY, asisten kesehatan suara cerdas berbahasa Indonesia untuk pasien. " +
+		"Kepribadianmu: ramah, perhatian, sopan, dan natural seperti asisten sungguhan. " +
+		"Panduan menjawab:\n" +
+		"- Sapa balik secara natural jika user menyapa (contoh: 'Halo!' → 'Halo! Ada yang bisa saya bantu?')\n" +
+		"- Gunakan data sensor HANYA jika user menanyakan kondisi kesehatannya\n" +
+		"- Jika user pamit atau berterima kasih, balas singkat dan sopan\n" +
+		"- Jawab maksimal 2 kalimat pendek, jelas dan enak didengar\n" +
+		"- Jangan diagnosis medis pasti; sarankan periksa tenaga medis bila ada tanda bahaya"
 
-	context := fmt.Sprintf(
-		"Data sensor terkini pasien — Suhu: %.1f°C, Detak jantung: %d bpm, SpO2: %d%%.",
-		t.Temperature, t.BPM, t.SpO2,
+	userText := fmt.Sprintf(
+		"[Konteks sensor tersedia — Suhu: %.1f°C, Detak: %d bpm, SpO2: %d%%]\nUser berkata: %s",
+		t.Temperature, t.BPM, t.SpO2, transcript,
 	)
-	userText := context + "\n\nPertanyaan pasien: " + transcript
 
 	payload := map[string]any{
 		"systemInstruction": map[string]any{
@@ -109,8 +112,8 @@ func (s *Service) reason(ctx context.Context, transcript string, t domain.Sensor
 			{Role: "user", Parts: []geminiPart{{Text: userText}}},
 		},
 		"generationConfig": map[string]any{
-			"temperature":     0.6,
-			"maxOutputTokens": 200,
+			"temperature":     0.7,
+			"maxOutputTokens": 300,
 		},
 	}
 
