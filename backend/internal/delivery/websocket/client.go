@@ -190,9 +190,10 @@ func (c *Client) handleDeviceMessage(msgType int, message []byte) {
 		}
 		payload.DeviceID = c.DeviceID // prevent spoofing
 
-		// Capture latest sensor values for the voice assistant context.
-		// Tolerant: also accept the firmware's flat {"temp","bpm","spo2"} shape.
-		c.SetSensor(extractSensor(message, payload.Sensor))
+		// Apply flat {"temp","bpm","spo2"} fallback BEFORE ProcessIncoming so the
+		// usecase receives real sensor values, not the zero defaults from Unmarshal.
+		payload.Sensor = extractSensor(message, payload.Sensor)
+		c.SetSensor(payload.Sensor)
 
 		if err := c.TelemetryUsecase.ProcessIncoming(context.Background(), payload); err != nil {
 			log.Printf("error processing payload: %v", err)

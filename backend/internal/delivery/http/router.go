@@ -36,7 +36,16 @@ func SetupRouter(
 	// Contoh nilai: ["http://localhost:3000", "https://healy.vercel.app"]
 	// Referensi: HEALY_Master_Blueprint v2.1.0 Section 7.1 & 8.1
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: cfg.CORSAllowedOrigins,
+		// AllowOriginFunc replaces AllowOrigins so we can also accept "file://"
+		// which is the default Origin header sent by the ESP32 WebSocket library.
+		AllowOriginFunc: func(origin string) bool {
+			for _, o := range cfg.CORSAllowedOrigins {
+				if origin == o {
+					return true
+				}
+			}
+			return origin == "file://" // ESP32 links2004/WebSockets default origin
+		},
 		AllowMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
@@ -103,16 +112,23 @@ func SetupRouter(
 				settings.PUT("/threshold", settingsHandler.UpdateThreshold)
 			}
 
-			// Device status endpoint
+			// Device status endpoint — queries real hub state
 			device := protected.Group("/device")
 			{
 				device.GET("/status", func(c *gin.Context) {
-					// MVP: return connected status.
-					// A full implementation would track device heartbeats via a thread-safe accessor.
+					dev := hub.CurrentDevice()
+					if dev == nil {
+						c.JSON(http.StatusOK, gin.H{
+							"device_id": c.DefaultQuery("device_id", "healy-esp32"),
+							"is_online": false,
+							"last_seen": "",
+						})
+						return
+					}
 					c.JSON(http.StatusOK, gin.H{
-						"device_id": "healy-001",
+						"device_id": dev.DeviceID,
 						"is_online": true,
-						"last_seen": "",
+						"last_seen": time.Now().UTC().Format(time.RFC3339),
 					})
 				})
 			}

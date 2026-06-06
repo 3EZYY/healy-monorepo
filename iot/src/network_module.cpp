@@ -4,9 +4,10 @@
 #include <WebSocketsClient.h>
 #include <string.h>
 
-// Konfigurasi WebSocket Lokal (Update)
-const char* websocket_host = "192.168.1.2";
-const uint16_t websocket_port = 8080;
+// Cloudflare Tunnel endpoint. TLS di-terminate di edge Cloudflare (cert valid),
+// library ESP32 otomatis setInsecure() saat tanpa fingerprint → tidak perlu CA bundle.
+const char* websocket_host = "api.healy-observer.my.id";
+const uint16_t websocket_port = 443;
 
 WebSocketsClient webSocket;
 const char* currentSsid;
@@ -85,8 +86,10 @@ void connectWiFi(const char* ssid, const char* password) {
 
 // Gunakan parameter const char* path (misalnya "/ws/device") saat pemanggilan di main.cpp
 void initWebSocket(const char* host, uint16_t port, const char* path) {
-  // Overriding parameter host dan port dengan konfigurasi lokal
-  webSocket.begin(websocket_host, websocket_port, path);
+  // WSS via Cloudflare Tunnel. Library defaultnya kirim "Origin: file://" yang diblok CORS.
+  // Override ke origin yang valid SEBELUM beginSSL supaya handshake lolos middleware.
+  webSocket.setExtraHeaders("Origin: https://healy-observer.my.id");
+  webSocket.beginSSL(websocket_host, websocket_port, path);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 }

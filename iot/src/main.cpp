@@ -80,7 +80,7 @@ void setup() {
   Serial.begin(115200);
 
   connectWiFi("ATAR ATAS", "atar1234");
-  initWebSocket("10.35.96.208", 8000, "/ws/device");
+  initWebSocket(nullptr, 0, "/ws/device?device_id=healy-esp32");
 
   Wire.begin(21, 22);
   Wire.setClock(100000);  // Standard Mode (100kHz) — clone OLEDs are unstable at 400kHz

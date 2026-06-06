@@ -35,7 +35,10 @@ func (u *telemetryUsecase) ProcessIncoming(ctx context.Context, payload domain.T
 	// 1. Evaluasi payload untuk mendapatkan TelemetryRecord dengan status threshold
 	record := EvaluatePayload(payload)
 
-	// Set waktu pembuatan record (sebelum disimpan ke DB)
+	// ESP32 tidak kirim timestamp — fallback ke server time supaya WHERE recorded_at >= NOW()-interval tidak exclude record ini.
+	if record.Timestamp.IsZero() {
+		record.Timestamp = time.Now()
+	}
 	record.CreatedAt = time.Now()
 
 	// 2. Simpan record ke repository (database)

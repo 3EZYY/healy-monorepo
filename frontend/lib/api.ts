@@ -137,13 +137,13 @@ function generateMockHistory(range: string): TelemetryRecord[] {
  * GET /api/telemetry/history?range=1h|6h|24h|7d
  * Returns historical telemetry records, ordered by recorded_at DESC.
  */
-export async function fetchTelemetryHistory(range: string = '1h'): Promise<TelemetryRecord[]> {
+export async function fetchTelemetryHistory(range: string = '1h', deviceId: string = 'healy-esp32'): Promise<TelemetryRecord[]> {
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 600)) // Simulate network latency
     return generateMockHistory(range)
   }
 
-  const res = await fetch(`${API_URL}/telemetry/history?range=${range}`, {
+  const res = await fetch(`${API_URL}/telemetry/history?range=${range}&device_id=${deviceId}`, {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`History fetch failed: ${res.status}`)
@@ -154,13 +154,13 @@ export async function fetchTelemetryHistory(range: string = '1h'): Promise<Telem
  * GET /api/telemetry/latest
  * Returns the most recent telemetry payload.
  */
-export async function fetchLatestTelemetry(): Promise<TelemetryPayload> {
+export async function fetchLatestTelemetry(deviceId: string = 'healy-esp32'): Promise<TelemetryPayload> {
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 300))
     return generateMockPayload()
   }
 
-  const res = await fetch(`${API_URL}/telemetry/latest`, {
+  const res = await fetch(`${API_URL}/telemetry/latest?device_id=${deviceId}`, {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`Latest fetch failed: ${res.status}`)
@@ -213,17 +213,17 @@ export async function updateThresholds(settings: ThresholdSettings): Promise<Thr
  * GET /api/device/status
  * Returns ESP32 device connection status.
  */
-export async function fetchDeviceStatus(): Promise<DeviceStatus> {
+export async function fetchDeviceStatus(deviceId: string = 'healy-esp32'): Promise<DeviceStatus> {
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 300))
     return {
-      device_id: 'healy-001',
+      device_id: 'healy-esp32',
       is_online: true,
       last_seen: new Date().toISOString(),
     }
   }
 
-  const res = await fetch(`${API_URL}/device/status`, {
+  const res = await fetch(`${API_URL}/device/status?device_id=${deviceId}`, {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`Device status fetch failed: ${res.status}`)

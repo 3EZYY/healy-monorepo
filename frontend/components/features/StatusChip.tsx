@@ -31,7 +31,7 @@ const STATUS_CONFIG = {
 } as const
 
 export default function StatusChip({ status, label, size = 'md', pulse = false }: StatusChipProps) {
-  const config = STATUS_CONFIG[status]
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.NORMAL
   const shouldPulse = pulse || status === 'CRITICAL'
 
   return (
