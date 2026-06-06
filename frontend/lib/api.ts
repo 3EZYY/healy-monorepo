@@ -95,6 +95,23 @@ export interface ThresholdSettings {
   temp_warn_max: number
   spo2_normal_min: number
   spo2_warn_min: number
+  bpm_normal_min: number
+  bpm_normal_max: number
+}
+
+// BPM thresholds are frontend-only (backend doesn't store them) — persisted in localStorage.
+function loadBpmThresholds(): { bpm_normal_min: number; bpm_normal_max: number } {
+  if (typeof window === 'undefined') return { bpm_normal_min: 60, bpm_normal_max: 100 }
+  return {
+    bpm_normal_min: parseInt(localStorage.getItem('healy_bpm_normal_min') ?? '60', 10),
+    bpm_normal_max: parseInt(localStorage.getItem('healy_bpm_normal_max') ?? '100', 10),
+  }
+}
+
+function saveBpmThresholds(min: number, max: number): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem('healy_bpm_normal_min', min.toString())
+  localStorage.setItem('healy_bpm_normal_max', max.toString())
 }
 
 export interface DeviceStatus {
@@ -180,6 +197,7 @@ export async function fetchThresholds(): Promise<ThresholdSettings> {
       temp_warn_max: 38.5,
       spo2_normal_min: 95,
       spo2_warn_min: 91,
+      ...loadBpmThresholds(),
     }
   }
 
@@ -187,7 +205,8 @@ export async function fetchThresholds(): Promise<ThresholdSettings> {
     headers: authHeaders(),
   })
   if (!res.ok) throw new Error(`Threshold fetch failed: ${res.status}`)
-  return res.json()
+  const data = await res.json()
+  return { ...data, ...loadBpmThresholds() }
 }
 
 /**
@@ -195,6 +214,9 @@ export async function fetchThresholds(): Promise<ThresholdSettings> {
  * Updates threshold configuration.
  */
 export async function updateThresholds(settings: ThresholdSettings): Promise<ThresholdSettings> {
+  // BPM fields are frontend-only — persist locally before calling the API.
+  saveBpmThresholds(settings.bpm_normal_min, settings.bpm_normal_max)
+
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 500))
     return settings // Echo back
@@ -203,10 +225,11 @@ export async function updateThresholds(settings: ThresholdSettings): Promise<Thr
   const res = await fetch(`${API_URL}/settings/threshold`, {
     method: 'PUT',
     headers: authHeaders(),
-    body: JSON.stringify(settings),
+    body: JSON.stringify(settings), // backend ignores unknown bpm_* fields
   })
   if (!res.ok) throw new Error(`Threshold update failed: ${res.status}`)
-  return res.json()
+  const data = await res.json()
+  return { ...data, bpm_normal_min: settings.bpm_normal_min, bpm_normal_max: settings.bpm_normal_max }
 }
 
 /**

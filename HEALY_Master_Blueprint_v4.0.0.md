@@ -8,10 +8,10 @@
 | **Document Version** | v4.0.0 |
 | **Status** | Active — Master Reference |
 | **Role Penyusun** | Senior Full-Stack Engineer & Technical Product Manager |
-| **Stack** | ESP32 (IoT) + Golang 1.23+ (Backend) + Next.js 14 (Frontend) |
+| **Stack** | ESP32 (IoT) + Golang 1.23+ (Backend) + Next.js 16 (Frontend) |
 | **Design Philosophy** | Clinical Futurism — Sage Green, Glacial White, Futuristic Medical |
-| **Last Updated** | 2025 |
-| **Changelog** | v4.0.0: Light/Dark Mode, AI Accent Revision (Teal), Separated History Charts, Interactive AI Chatbot (Context-Aware) |
+| **Last Updated** | 2026-06-06 |
+| **Changelog** | v4.0.0: Light/Dark Mode, AI Accent Revision (Teal), Separated History Charts, Interactive AI Chatbot (Context-Aware); **Post-v4.0.0 Hotfixes**: ESP32 WSS Cloudflare Tunnel, CORS `file://` origin fix, sensor data pipeline fix, timestamp fallback, device_id fix, StatusChip crash fix; **F-06**: BPM Threshold Settings UI + Logout functionality |
 
 > **Catatan Arsitektural:** Semua spesifikasi Backend (Golang, Hub, WebSocket, REST API, Supabase, deployment Railway/Render) dari v3.0.0 tetap berlaku tanpa perubahan. v4.0.0 adalah **Frontend-only upgrade** yang dipicu oleh revisi Dosen Penguji. Dokumen ini hanya memuat delta perubahan terhadap v3.0.0. Baca v3.0.0 sebagai fondasi sebelum mengimplementasikan v4.0.0.
 
@@ -1644,7 +1644,16 @@ if (!mounted) return <div className="w-8 h-8" /> // Placeholder dimensi sama
 
 Semua file backend berstatus ✅ DONE. Tidak ada perubahan di Fase 12–15.
 
-### Status Frontend — Delta v4.0.0
+### Status Backend — Post-v4.0.0 Hotfixes (2026-06-06)
+
+| File | Status | Keterangan |
+|---|---|---|
+| `internal/delivery/http/router.go` | ✅ DONE | MODIFY — `AllowOriginFunc` CORS (izinkan `file://` origin ESP32); device/status pakai hub real |
+| `internal/delivery/websocket/client.go` | ✅ DONE | MODIFY — `payload.Sensor = extractSensor(...)` sebelum `ProcessIncoming` (fix bpm/spo2=0) |
+| `internal/usecase/telemetry_usecase.go` | ✅ DONE | MODIFY — timestamp fallback `IsZero()` (ESP32 tidak kirim timestamp) |
+| `internal/repository/postgres/telemetry_postgres.go` | ✅ DONE | No change — schema `telemetry.telemetry_records` dibuat manual di Supabase |
+
+### Status Frontend — Delta v4.0.0 + F-06
 
 | File | Status | Keterangan |
 |---|---|---|
@@ -1657,16 +1666,26 @@ Semua file backend berstatus ✅ DONE. Tidak ada perubahan di Fase 12–15.
 | `constants/design-tokens.ts` | ✅ DONE | MODIFY — aiAccent teal, master v4.0 (F-02) |
 | `types/chat.ts` | ⬜ TODO | NEW — ChatMessage, ChatContext (F-04) |
 | `types/telemetry.ts` | ✅ DONE | MODIFY — tambah TelemetryChartPoint (F-03) |
+| `lib/api.ts` | ✅ DONE | MODIFY — `device_id=healy-esp32` default; `ThresholdSettings` + BPM fields; `StatusChip` fallback (F-06 + Hotfix) |
 | `lib/groq-client.ts` | ⬜ TODO | MODIFY — tambah callGroqChat (F-04) |
 | `hooks/useChatbot.ts` | ⬜ TODO | NEW — chatbot state management (F-04) |
-| `components/features/NavSidebar.tsx` | ⬜ TODO | MODIFY — ChatbotTrigger button (F-04) |
+| `components/features/NavSidebar.tsx` | ✅ DONE | MODIFY — ChatbotTrigger button (F-04) + Logout handler `useRouter` + clear token (F-06) |
 | `components/features/AIInsightCard.tsx` | ✅ DONE | MODIFY — teal accent (F-02) |
 | `components/features/AlertFeed.tsx` | ✅ DONE | MODIFY — teal accent (F-02) |
+| `components/features/StatusChip.tsx` | ✅ DONE | MODIFY — fallback `?? STATUS_CONFIG.NORMAL` untuk status `""` (Hotfix) |
 | `components/features/AIChatPanel.tsx` | ⬜ TODO | NEW — sliding chatbot panel (F-04) |
 | `components/features/TemperatureChart.tsx` | ✅ DONE | NEW — standalone temp chart (F-03) |
 | `components/features/HeartRateChart.tsx` | ✅ DONE | NEW — standalone BPM chart (F-03) |
 | `components/features/SpO2Chart.tsx` | ✅ DONE | NEW — standalone SpO2 chart (F-03) |
+| `app/settings/page.tsx` | ✅ DONE | MODIFY — BPM Threshold card + HeartPulse icon + validasi (F-06) |
 | `app/dashboard/page.tsx` | ⬜ TODO | MODIFY — integrasi chatbot (F-04) |
+
+### Status IoT — Post-v4.0.0 Hotfixes (2026-06-06)
+
+| File | Status | Keterangan |
+|---|---|---|
+| `iot/src/network_module.cpp` | ✅ DONE | MODIFY — `beginSSL` port 443 Cloudflare Tunnel; `setExtraHeaders("Origin: https://healy-observer.my.id")` |
+| `iot/src/main.cpp` | ✅ DONE | MODIFY — path `/ws/device?device_id=healy-esp32`; `initWebSocket(nullptr, 0, ...)` |
 
 ---
 
@@ -2159,3 +2178,63 @@ Tanpa keduanya → voice assistant **DISABLED** otomatis (`Service.Enabled()` fa
 | V-04 | True single-call native audio belum dipakai | LOW | Upgrade ke **Gemini Live API** (WebSocket) untuk reasoning+audio satu shot + barge-in |
 | V-05 | Telemetry firmware masih flat `{"temp",...}` vs domain nested `{"sensor":{...}}` | MEDIUM | `extractSensor()` sudah toleran utk konteks AI, tapi path simpan-DB sebaiknya diselaraskan |
 | V-06 | Belum ada echo-cancellation | LOW | Speaker bisa ter-pickup mic jika berdekatan; pisahkan fisik atau half-duplex (sudah half-duplex via mode switch) |
+
+---
+
+## 16. F-06: BPM Threshold Settings UI + Logout Fix
+
+> **Scope:** Frontend-only.
+> **Last Updated:** 2026-06-06
+
+### 16.1 Ringkasan
+
+| ID | Fitur | File | Status |
+|---|---|---|---|
+| F-06a | BPM Threshold Card di Settings | `app/settings/page.tsx`, `lib/api.ts` | ✅ DONE |
+| F-06b | Logout button fungsional | `components/features/NavSidebar.tsx` | ✅ DONE |
+
+### 16.2 F-06a — BPM Threshold UI
+
+**Arsitektur keputusan:** Backend (`ThresholdSettingsDTO`) hanya menyimpan Temperature + SpO₂. BPM threshold bersifat **frontend-only**, dipersistensikan di `localStorage` dengan key `healy_bpm_normal_min` / `healy_bpm_normal_max`. Default: `60` / `100` bpm.
+
+**Interface update (`lib/api.ts`):**
+```typescript
+export interface ThresholdSettings {
+  // ... existing fields ...
+  bpm_normal_min: number   // frontend-only, dari localStorage
+  bpm_normal_max: number   // frontend-only, dari localStorage
+}
+```
+
+**Merge strategy:**
+- `fetchThresholds()` — merge API response + `loadBpmThresholds()` dari localStorage
+- `updateThresholds()` — `saveBpmThresholds()` ke localStorage, lalu PUT ke API (backend mengabaikan field BPM unknown)
+
+**UI Card:**
+- Ikon: `HeartPulse` dari `lucide-react` dengan warna `text-healy-critical`
+- 2 input: Normal Min (default 60) + Normal Max (default 100)
+- Threshold bar: Warning/Low `<60` | Normal `60–100` | Warning/High `>100`
+- Validasi: `bpm_normal_min >= bpm_normal_max` → error sebelum save
+
+### 16.3 F-06b — Logout Handler
+
+```typescript
+// NavSidebar.tsx
+const router = useRouter()  // dari 'next/navigation'
+
+const handleLogout = () => {
+  localStorage.removeItem('healy_token')
+  localStorage.removeItem('healy_bpm_normal_min')
+  localStorage.removeItem('healy_bpm_normal_max')
+  router.push('/login')
+}
+```
+
+### 16.4 Verifikasi
+
+| Check | Status |
+|---|---|
+| `npx tsc --noEmit` | ✅ Pass (0 errors) |
+| BPM card render tanpa crash | ✅ Pass |
+| Logout redirect ke `/login` | ✅ Pass |
+| BPM persists setelah reload | ✅ Via localStorage |

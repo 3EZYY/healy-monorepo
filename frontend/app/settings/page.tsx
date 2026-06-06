@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { fetchThresholds, updateThresholds, type ThresholdSettings } from '@/lib/api'
-import { Save, RotateCcw, Loader2, CheckCircle, AlertCircle, Thermometer, Wind } from 'lucide-react'
+import { Save, RotateCcw, Loader2, CheckCircle, AlertCircle, Thermometer, Wind, HeartPulse } from 'lucide-react'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -128,6 +128,11 @@ export default function SettingsPage() {
       setSaving(false)
       return
     }
+    if (settings.bpm_normal_min >= settings.bpm_normal_max) {
+      setError('BPM Normal Min must be less than Normal Max')
+      setSaving(false)
+      return
+    }
 
     try {
       const updated = await updateThresholds(settings)
@@ -142,7 +147,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Field updater
   const updateField = (field: keyof ThresholdSettings) => (value: number) => {
     if (settings) setSettings({ ...settings, [field]: value })
   }
@@ -287,7 +291,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* ─── SpO2 Thresholds ─── */}
-      <motion.div variants={fadeUp} className="glass-card p-6 mb-8">
+      <motion.div variants={fadeUp} className="glass-card p-6 mb-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center">
             <Wind className="w-5 h-5 text-[#3B82F6]" />
@@ -339,6 +343,63 @@ export default function SettingsPage() {
             <span>CRITICAL</span>
             <span>WARNING</span>
             <span className="text-right">NORMAL</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ─── Heart Rate (BPM) Thresholds ─── */}
+      <motion.div variants={fadeUp} className="glass-card p-6 mb-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-healy-critical/10 flex items-center justify-center">
+            <HeartPulse className="w-5 h-5 text-healy-critical" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-lg font-display font-semibold text-healy-graphite">Heart Rate (BPM)</h2>
+            <p className="text-xs font-body text-healy-slate">Resting heart rate normal range (bpm)</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ThresholdInput
+            label="Normal Min"
+            value={settings.bpm_normal_min}
+            unit="bpm"
+            onChange={updateField('bpm_normal_min')}
+            min={30}
+            max={90}
+            step={1}
+            hint="Below this → WARNING (bradycardia)"
+          />
+          <ThresholdInput
+            label="Normal Max"
+            value={settings.bpm_normal_max}
+            unit="bpm"
+            onChange={updateField('bpm_normal_max')}
+            min={60}
+            max={200}
+            step={1}
+            hint="Above this → WARNING (tachycardia)"
+          />
+        </div>
+
+        {/* Visual threshold bar */}
+        <div className="mt-6 pt-4 border-t border-healy-border/50">
+          <p className="text-xs font-body text-healy-slate mb-2">Threshold Visualization</p>
+          <div className="flex items-center h-8 rounded-lg overflow-hidden text-[10px] font-mono text-white" role="img" aria-label={`BPM threshold visualization: Warning below ${settings.bpm_normal_min}, Normal ${settings.bpm_normal_min} to ${settings.bpm_normal_max}, Warning above ${settings.bpm_normal_max}`}>
+            <div className="bg-healy-warning flex-1 flex items-center justify-center">
+              &lt; {settings.bpm_normal_min}
+            </div>
+            <div className="bg-healy-sage flex-2 flex items-center justify-center">
+              {settings.bpm_normal_min} — {settings.bpm_normal_max}
+            </div>
+            <div className="bg-healy-warning flex-1 flex items-center justify-center">
+              &gt; {settings.bpm_normal_max}
+            </div>
+          </div>
+          <div className="flex justify-between text-[10px] font-mono text-healy-slate mt-1">
+            <span className="text-healy-warning">WARNING / Low</span>
+            <span>NORMAL</span>
+            <span className="text-right text-healy-warning">WARNING / High</span>
           </div>
         </div>
       </motion.div>

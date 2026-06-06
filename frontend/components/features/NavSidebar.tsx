@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard,
@@ -30,7 +30,15 @@ interface NavSidebarProps {
 
 export default function NavSidebar({ onOpenChat }: NavSidebarProps) {
   const pathname = usePathname()
-  
+  const router = useRouter()
+
+  const handleLogout = () => {
+    localStorage.removeItem('healy_token')
+    localStorage.removeItem('healy_bpm_normal_min')
+    localStorage.removeItem('healy_bpm_normal_max')
+    router.push('/login')
+  }
+
   const [apiKey, setApiKey] = useState(() => getStoredGroqKey() || '')
   const [showKey, setShowKey] = useState(false)
   const [keySaved, setKeySaved] = useState(false)
@@ -170,6 +178,7 @@ export default function NavSidebar({ onOpenChat }: NavSidebarProps) {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={handleLogout}
             aria-label="Logout from dashboard"
             className="
               flex-1 flex items-center gap-3 px-4 py-3 rounded-xl
