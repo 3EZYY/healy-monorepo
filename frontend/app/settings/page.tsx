@@ -112,24 +112,19 @@ export default function SettingsPage() {
     setError('')
     setSuccess('')
 
-    // Validation
+    // Validation — only logical ordering checks
     if (settings.temp_normal_min >= settings.temp_normal_max) {
-      setError('Temperature Normal Min must be less than Normal Max')
-      setSaving(false)
-      return
-    }
-    if (settings.temp_normal_max >= settings.temp_warn_max) {
-      setError('Temperature Normal Max must be less than Warning Max')
+      setError('Temperature: Normal Min harus lebih kecil dari Normal Max')
       setSaving(false)
       return
     }
     if (settings.spo2_warn_min >= settings.spo2_normal_min) {
-      setError('SpO₂ Warning Min must be less than Normal Min')
+      setError('SpO₂: Warning Min harus lebih kecil dari Normal Min')
       setSaving(false)
       return
     }
     if (settings.bpm_normal_min >= settings.bpm_normal_max) {
-      setError('BPM Normal Min must be less than Normal Max')
+      setError('BPM: Normal Min harus lebih kecil dari Normal Max')
       setSaving(false)
       return
     }
@@ -240,8 +235,8 @@ export default function SettingsPage() {
             value={settings.temp_normal_min}
             unit="°C"
             onChange={updateField('temp_normal_min')}
-            min={34}
-            max={38}
+            min={30}
+            max={45}
             hint="Below this → CRITICAL"
           />
           <ThresholdInput
@@ -249,8 +244,8 @@ export default function SettingsPage() {
             value={settings.temp_normal_max}
             unit="°C"
             onChange={updateField('temp_normal_max')}
-            min={36}
-            max={39}
+            min={30}
+            max={45}
             hint="Above this → WARNING"
           />
           <ThresholdInput
@@ -258,8 +253,8 @@ export default function SettingsPage() {
             value={settings.temp_warn_max}
             unit="°C"
             onChange={updateField('temp_warn_max')}
-            min={37}
-            max={42}
+            min={30}
+            max={45}
             hint="Above this → CRITICAL"
           />
         </div>
@@ -308,7 +303,7 @@ export default function SettingsPage() {
             value={settings.spo2_normal_min}
             unit="%"
             onChange={updateField('spo2_normal_min')}
-            min={90}
+            min={50}
             max={100}
             step={1}
             hint="Below this → WARNING"
@@ -318,8 +313,8 @@ export default function SettingsPage() {
             value={settings.spo2_warn_min}
             unit="%"
             onChange={updateField('spo2_warn_min')}
-            min={80}
-            max={95}
+            min={50}
+            max={100}
             step={1}
             hint="Below this → CRITICAL"
           />
@@ -365,8 +360,8 @@ export default function SettingsPage() {
             value={settings.bpm_normal_min}
             unit="bpm"
             onChange={updateField('bpm_normal_min')}
-            min={30}
-            max={90}
+            min={20}
+            max={250}
             step={1}
             hint="Below this → WARNING (bradycardia)"
           />
@@ -375,8 +370,8 @@ export default function SettingsPage() {
             value={settings.bpm_normal_max}
             unit="bpm"
             onChange={updateField('bpm_normal_max')}
-            min={60}
-            max={200}
+            min={20}
+            max={300}
             step={1}
             hint="Above this → WARNING (tachycardia)"
           />
